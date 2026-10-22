@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SIM SMP Darussalam</title>
+  <style>
+    :root {
+      --primary: #2563eb; --primary-dark: #1d4ed8; --bg: #f1f5f9;
+      --sidebar: #0f172a; --border: #e2e8f0; --muted: #64748b;
+      --success: #16a34a; --danger: #dc2626; --warning: #d97706;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: #0f172a; line-height: 1.5; font-size: 14px; }
+    
+    .loading-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.6); z-index: 2000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
+    .loading-overlay.show { display: flex; }
+    .loading-box { background: #1e293b; color: #fff; padding: 22px 32px; border-radius: 12px; text-align: center; }
+    .spin { font-size: 2rem; animation: spin 1s linear infinite; display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    
+    .toast { position: fixed; bottom: 20px; right: 20px; background: #0f172a; color: #fff; padding: 12px 18px; border-radius: 8px; font-size: .88rem; opacity: 0; transform: translateY(20px); transition: .25s; pointer-events: none; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,.15); }
+    .toast.show { opacity: 1; transform: none; }
+    .toast.error { border-left: 4px solid var(--danger); }
+    .toast.success { border-left: 4px solid var(--success); }
+
+    .login-screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #1e3a8a, #2563eb); z-index: 1500; padding: 20px; }
+    .login-card { background: #fff; border-radius: 16px; padding: 32px 28px; width: 100%; max-width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+    .login-card h1 { font-size: 1.5rem; color: var(--primary-dark); text-align: center; }
+    .login-card p { color: var(--muted); text-align: center; margin-bottom: 20px; font-size: .88rem; }
+    .logo { font-size: 3rem; text-align: center; margin-bottom: 8px; }
+
+    .app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+    .sidebar { background: var(--sidebar); padding: 20px 0; overflow-y: auto; position: sticky; top: 0; height: 100vh; }
+    .brand { display: flex; align-items: center; gap: 10px; padding: 0 20px 20px; border-bottom: 1px solid #1e293b; margin-bottom: 16px; }
+    .brand .name { color: #fff; font-weight: 700; }
+    .brand .sub { font-size: .7rem; color: #94a3b8; }
+    .nav-section { font-size: .68rem; text-transform: uppercase; color: #475569; padding: 12px 20px 6px; font-weight: 700; }
+    .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 20px; cursor: pointer; font-size: .88rem; color: #94a3b8; border-left: 3px solid transparent; transition: .15s; }
+    .nav-item:hover, .nav-item.active { background: #1e293b; color: #fff; border-left-color: var(--primary); }
+    .main { display: flex; flex-direction: column; min-width: 0; }
+    .topbar { background: #fff; padding: 14px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 50; }
+    .avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+    #content { padding: 22px; max-width: 1400px; width: 100%; margin: 0 auto; animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+
+    .card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+    .card h3 { font-size: 1rem; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 2px solid var(--border); color: var(--primary-dark); }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    label { font-size: .8rem; font-weight: 600; color: #334155; }
+    input, select, textarea { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: .88rem; width: 100%; outline: none; transition: border 0.2s; }
+    input:focus, select:focus, textarea:focus { border-color: var(--primary); }
+    textarea { min-height: 60px; resize: vertical; }
+    .btn { padding: 8px 16px; border: none; border-radius: 6px; font-size: .85rem; font-weight: 600; cursor: pointer; display: inline-flex; gap: 5px; align-items: center; transition: opacity 0.2s; }
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-warning { background: var(--warning); color: #fff; }
+    .btn-secondary { background: #e2e8f0; color: #334155; }
+    .btn-sm { padding: 4px 10px; font-size: .75rem; }
+    .btn-row { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+    
+    .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    th { background: #f8fafc; padding: 10px; text-align: left; font-size: .72rem; text-transform: uppercase; border-bottom: 2px solid var(--border); white-space: nowrap; }
+    td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tr:hover { background: #f8fafc; }
+    .badge { padding: 2px 8px; border-radius: 999px; font-size: .7rem; font-weight: 700; white-space: nowrap; }
+    .b-green { background: #dcfce7; color: #166534; }
+    .b-blue { background: #dbeafe; color: #1e40af; }
+    .b-red { background: #fee2e2; color: #991b1b; }
+    .b-yellow { background: #fef3c7; color: #92400e; }
+
+    .nilai-input { width: 65px !important; padding: 4px 6px !important; text-align: center; }
+
+    @media(max-width: 800px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar { position: fixed; left: -240px; top: 0; bottom: 0; width: 240px; z-index: 200; transition: .25s; }
+      .sidebar.open { left: 0; }
+      .menu-toggle { display: flex !important; }
+    }
+    .menu-toggle { display: none; background: none; border: none; font-size: 1.4rem; cursor: pointer; padding: 4px 8px; }
+  </style>
+</head>
+<body>
+
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-box"><div class="spin">⏳</div><div id="loadingText" style="margin-top:10px;">Memuat...</div></div>
+  </div>
+
+  <div class="login-screen" id="loginScreen">
+    <div class="login-card">
+      <div class="logo">🏫</div>
+      <h1>SIM SEKOLAH</h1>
+      <p>Sistem Informasi Manajemen Sekolah</p>
+      <div class="field" style="margin-bottom:10px;"><label>Username</label><input type="text" id="loginName" placeholder="admin"></div>
+      <div class="field" style="margin-bottom:16px;"><label>Password</label><input type="password" id="loginPassword" placeholder="admin123"></div>
+      <button class="btn btn-primary" style="width:100%; justify-content:center;" onclick="doLogin()" id="btnLogin">🔐 Masuk</button>
+    </div>
+  </div>
+
+  <div class="app" id="app" style="display:none;">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand"><div style="font-size:1.6rem;">🏫</div><div><div class="name">SIM SEKOLAH</div><div class="sub">Darussalam</div></div></div>
+      
+      <div class="nav-section">Menu Utama</div>
+      <div class="nav-item active" data-route="dashboard" onclick="navigate('dashboard')">📊 Dashboard</div>
+      
+      <div id="menuAdminData" style="display:none;">
+        <div class="nav-item" data-route="siswa" onclick="navigate('siswa')">👤 Siswa</div>
+        <div class="nav-item" data-route="guru" onclick="navigate('guru')">💼 Guru & Pegawai</div>
+        <div class="nav-item" data-route="administrasi" onclick="navigate('administrasi')">📋 Administrasi</div>
+      </div>
+
+      <div class="nav-item" data-route="akademik" onclick="navigate('akademik')">📚 Akademik</div>
+      <div class="nav-item" data-route="kasus" onclick="navigate('kasus')">⚠️ Kasus</div>
+      <div class="nav-item" data-route="jurnal" onclick="navigate('jurnal')">📓 Jurnal</div>
+      <div class="nav-item" data-route="agenda" onclick="navigate('agenda')">🗓️ Agenda</div>
+      
+      <div style="padding:20px; border-top:1px solid #1e293b; margin-top:20px;">
+        <button class="btn btn-danger btn-sm" style="width:100%; justify-content:center;" onclick="doLogout()">🚪 Logout</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+          <h2 id="pageTitle">Dashboard</h2>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="text-align:right; font-size:.78rem;">
+            <div id="userName" style="font-weight:700;">—</div>
+            <div id="userRole" style="color:var(--muted);">—</div>
+          </div>
+          <div class="avatar" id="avatar">A</div>
+        </div>
+      </header>
+      <div id="content"></div>
+    </main>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    // ==========================================
+    // KONFIGURASI GITHUB PAGES
+    // ==========================================
+    // MASUKKAN URL WEB APP GOOGLE APPS SCRIPT ANDA DI SINI
+    const WEB_APP_URL = 'URL_WEB_APP_ANDA_DI_SINI'; 
+
+    let CURRENT_USER = null;
+    let TAHUN_AJARAN_AKTIF = '2024/2025';
+    let DB = { pengaturan: [], siswa: [], guru: [], kelas: [], mapel: [], jadwal: [], nilai: [], absensi: [], kasus: [], jurnal: [], agenda: [], audit: [] };
+    let currentSubTab = 'kelas';
+    let subTabAbsensi = 'input';
+    let editKasusId = null;
+    let editJurnalId = null;
+
+    const $ = (s) => document.querySelector(s);
+    const esc = (s='') => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const nSiswa = (id) => DB.siswa.find(s => s.id === id)?.nama || '—';
+    const nGuru = (id) => DB.guru.find(g => g.id === id)?.nama || '—';
+    const nKelas = (id) => DB.kelas.find(k => k.id === id)?.nama || '—';
+    const nMapel = (id) => DB.mapel.find(m => m.id === id)?.nama || '—';
+    
+    const nilaiAkhir = (n) => {
+      const arrHarian = String(n.harian || '0').split(',').map(Number);
+      const avgHarian = arrHarian.length ? arrHarian.reduce((a,b)=>a+b,0)/arrHarian.length : 0;
+      const uts = Number(n.uts) || 0;
+      const uas = Number(n.uas) || 0;
+      return Math.round(((avgHarian + uts + uas) / 3) * 100) / 100;
+    };
+
+    function toast(msg, type = 'success') {
+      const el = $('#toast'); el.textContent = msg; el.className = `toast show ${type}`;
+      setTimeout(() => el.className = `toast ${type}`, 3000);
+    }
+    function showLoading(m = 'Memuat...') { $('#loadingText').textContent = m; $('#loadingOverlay').classList.add('show'); }
+    function hideLoading() { $('#loadingOverlay').classList.remove('show'); }
+
+    // ==========================================
+    // API CALL (Menggunakan Fetch untuk GitHub Pages)
+    // ==========================================
+    function apiCall(action, entity, payload = {}) {
+      return new Promise((resolve, reject) => {
+        const body = { action, entity, user: CURRENT_USER?.nama || 'system', ...payload };
+        
+        if (!WEB_APP_URL || !WEB_APP_URL.includes('script.google.com')) {
+          return reject(new Error('URL Web App belum diisi. Buka index.html dan ganti WEB_APP_URL.'));
+        }
+
+        fetch(WEB_APP_URL, {
+          method: 'POST',
+          // Menggunakan text/plain agar tidak diblokir oleh CORS Google
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(body)
+        })
+        .then(res => res.text())
+        .then(text => {
+          try {
+            const res = JSON.parse(text);
+            if (!res) return reject(new Error('Response kosong dari server.'));
+            if (res.ok === false || res.success === false) return reject(new Error(res.error || res.message));
+            resolve(res);
+          } catch (e) {
+            console.error("Server Error Response:", text);
+            reject(new Error('Gagal terhubung ke server. Pastikan Deploy Web App sudah versi terbaru & Access: Anyone.'));
+          }
+        })
+        .catch(err => reject(new Error('Gagal Fetch: ' + err.message)));
+      });
+    }
+
+    // ==========================================
+    // LOGIN
+    // ==========================================
+    async function doLogin() {
+      const u = $('#loginName').value.trim();
+      const p = $('#loginPassword').value;
+      const btn = $('#btnLogin');
+      if (!u || !p) return toast('Isi username & password!', 'error');
+      
+      btn.disabled = true; btn.textContent = 'Memverifikasi...'; showLoading('Autentikasi...');
+      try {
+        const res = await apiCall('login', 'users', { data: { username: u, password: p } });
+        CURRENT_USER = { username: res.data.username, role: res.data.role, nama: res.data.nama };
+        
+        if (res.data.db) DB = { ...DB, ...res.data.db };
+        else { const all = await apiCall('getAllData'); DB = { ...DB, ...all.data }; }
+        
+        const taDb = DB.pengaturan.find(p => p.key === 'tahunAjaranAktif');
+        if (taDb) TAHUN_AJARAN_AKTIF = taDb.value;
+        
+        hideLoading();
+        $('#loginScreen').style.display = 'none';
+        $('#app').style.display = 'grid';
+        
+        $('#userName').textContent = CURRENT_USER.nama;
+        $('#userRole').textContent = CURRENT_USER.role;
+        $('#avatar').textContent = CURRENT_USER.nama[0].toUpperCase();
+        
+        if (CURRENT_USER.role.toLowerCase().includes('admin')) {
+          document.getElementById('menuAdminData').style.display = 'block';
+        } else {
+          document.getElementById('menuAdminData').style.display = 'none';
+        }
+        
+        navigate('dashboard');
+        toast(`Selamat datang, ${CURRENT_USER.nama}`);
+      } catch (e) {
+        hideLoading(); alert(`❌ GAGAL LOGIN\n\n${e.message}`);
+      } finally {
+        btn.disabled = false; btn.textContent = '🔐 Masuk';
+      }
+    }
+
+    function doLogout() {
+      if (!confirm('Logout dari sistem?')) return;
+      CURRENT_USER = null; $('#app').style.display = 'none'; $('#loginScreen').style.display = 'flex'; $('#loginPassword').value = '';
+    }
+
+    function getMyWaliKelasInfo() {
+      if (!CURRENT_USER || !CURRENT_USER.nama) return null;
+      const firstName = CURRENT_USER.nama.split(' ')[0].toLowerCase(); 
+      const myGuru = DB.guru.find(g => g.nama && g.nama.toLowerCase().includes(firstName));
+      if (!myGuru) return null;
+      const myKelas = DB.kelas.find(k => k.waliKelasId === myGuru.id);
+      if (!myKelas) return null; 
+      return { guruId: myGuru.id, kelasId: myKelas.id, kelasNama: myKelas.nama };
+    }
+
+    function navigate(route) {
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.route === route));
+      const titles = { dashboard: 'Dashboard', siswa: 'Data Siswa', guru: 'Guru & Pegawai', akademik: 'Akademik', administrasi: 'Administrasi & Laporan', kasus: 'Catatan Kasus', jurnal: 'Jurnal', agenda: 'Agenda Sekolah' };
+      $('#pageTitle').textContent = titles[route];
+      
+      const map = { dashboard: renderDashboard, siswa: renderSiswa, guru: renderGuru, akademik: renderAkademik, administrasi: renderAdmin, kasus: renderKasus, jurnal: renderJurnal, agenda: renderAgenda };
+      $('#content').innerHTML = map[route]();
+      $('#sidebar').classList.remove('open');
+      if (route === 'akademik') activateSubTab(currentSubTab);
+    }
+
+    function getVal(key, def) { return DB.pengaturan.find(p => p.key === key)?.value || def; }
+
+    function getKopSurat() {
+      const logoUrl = getVal('logo', '');
+      let logoHtml = logoUrl ? `<img src="${logoUrl}" style="max-width:80px; max-height:80px;">` : `<div style="width:80px; height:80px; background:#eee; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px;">🏫</div>`;
+      return `
+        <div style="display:flex; align-items:center; border-bottom:3px solid #000; padding-bottom:10px; margin-bottom:20px;">
+          <div style="width:100px; text-align:center;">${logoHtml}</div>
+          <div style="flex:1; text-align:center; padding:0 10px;">
+            <div style="font-size:14px; font-weight:bold;">${getVal('namaYayasan', 'YAYASAN PENDIDIKAN')}</div>
+            <div style="font-size:20px; font-weight:bold; margin:2px 0;">${getVal('namaSekolah', 'NAMA SEKOLAH')}</div>
+            <div style="font-size:11px;">${getVal('akreditasi', '')}</div>
+            <div style="font-size:11px;">${getVal('alamat', '')}</div>
+            <div style="font-size:11px;">${getVal('kontak', '')}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function getTandaTangan(role = 'guru', mapelId = null) {
+      let ttdKiri = '', ttdKanan = '';
+      const tgl = new Date().toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'});
+      const kepsek = getVal('kepsek', '..............................');
+      const nrks = getVal('nrksKepsek', getVal('nipKepsek', '-'));
+
+      let guruName = CURRENT_USER.nama;
+      let jabatanKanan = 'Guru Mata Pelajaran';
+      let idKanan = 'NUPTK: -';
+      let nuptk = '-';
+
+      const firstName = CURRENT_USER.nama.split(' ')[0].toLowerCase(); 
+      const myGuru = DB.guru.find(g => g.nama.toLowerCase().includes(firstName));
+      if (myGuru) { guruName = myGuru.nama; nuptk = myGuru.nip || '-'; }
+
+      if (role === 'guru' && mapelId) {
+        const mapelGuru = DB.guru.find(g => g.mapelId === mapelId);
+        if (mapelGuru) { guruName = mapelGuru.nama; nuptk = mapelGuru.nip || '-'; }
+      }
+
+      if (role === 'wali') { jabatanKanan = 'Wali Kelas'; idKanan = `NUPTK: ${nuptk}`; } 
+      else if (role === 'kepsek' || CURRENT_USER.role.toLowerCase().includes('kepsek')) { jabatanKanan = 'Kepala Sekolah'; guruName = kepsek; idKanan = `NRKS: ${nrks}`; } 
+      else { idKanan = `NUPTK: ${nuptk}`; }
+
+      ttdKiri = `<div style="text-align:center;"><p>Mengetahui,</p><p>Kepala Sekolah</p><br><br><br><p style="font-weight:bold; text-decoration:underline;">${kepsek}</p><p>NRKS: ${nrks}</p></div>`;
+      ttdKanan = `<div style="text-align:center;"><p>Garut, ${tgl}</p><p>${jabatanKanan}</p><br><br><br><p style="font-weight:bold; text-decoration:underline;">${guruName}</p><p>${idKanan}</p></div>`;
+
+      return `<div style="display:flex; justify-content:space-between; margin-top:40px;"><div style="width:45%;">${ttdKiri}</div><div style="width:45%;">${ttdKanan}</div></div>`;
+    }
+
+    // ==========================================
+    // RENDER FUNCTIONS (INDEX.HTML LAMA)
+    // ==========================================
+    function renderDashboard() {
+      const waliInfo = getMyWaliKelasInfo();
+      let infoHtml = waliInfo ? `<div class="card" style="background:#eff6ff; border-left:4px solid var(--primary);"><h3>👨‍🏫 Anda adalah Wali Kelas: <span style="color:var(--primary)">${waliInfo.kelasNama}</span></h3></div>` : '';
+
+      return `
+        ${infoHtml}
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:12px; margin-bottom:16px;">
+          <div class="card" style="margin:0;"><div style="font-size:1.5rem; font-weight:800; color:var(--primary)">${DB.siswa.length}</div><div style="font-size:.8rem; color:var(--muted)">Siswa</div></div>
+          <div class="card" style="margin:0;"><div style="font-size:1.5rem; font-weight:800; color:var(--success)">${DB.guru.length}</div><div style="font-size:.8rem; color:var(--muted)">Guru</div></div>
+          <div class="card" style="margin:0;"><div style="font-size:1.5rem; font-weight:800; color:var(--warning)">${DB.kasus.length}</div><div style="font-size:.8rem; color:var(--muted)">Kasus</div></div>
+          <div class="card" style="margin:0;"><div style="font-size:1.5rem; font-weight:800; color:var(--danger)">${DB.agenda.length}</div><div style="font-size:.8rem; color:var(--muted)">Agenda</div></div>
+        </div>
+        <div class="card"><h3>⚡ Tahun Ajaran Aktif: <span style="color:var(--primary)">${TAHUN_AJARAN_AKTIF}</span></h3></div>
+        <div class="card"><h3>Aktivitas Terbaru</h3><div class="table-wrap"><table><thead><tr><th>User</th><th>Aksi</th><th>Entitas</th></tr></thead><tbody>${DB.audit.slice(0,5).map(a => `<tr><td>${esc(a.user)}</td><td>${esc(a.action)}</td><td>${esc(a.entity)}</td></tr>`).join('') || '<tr><td colspan="3" class="empty">Belum ada</td></tr>'}</tbody></table></div></div>`;
+    }
+
+    function renderSiswa() {
+      return `
+        <div class="card">
+          <h3>👤 Tambah Siswa</h3>
+          <form onsubmit="submitForm(event, 'siswa')">
+            <div class="form-grid">
+              <div class="field"><label>NISN</label><input name="nisn" required></div>
+              <div class="field"><label>NIS</label><input name="nis" required></div>
+              <div class="field"><label>Nama Lengkap</label><input name="nama" required></div>
+              <div class="field"><label>Jenis Kelamin</label><select name="jk"><option value="L">Laki-laki</option><option value="P">Perempuan</option></select></div>
+              <div class="field"><label>Kelas</label><select name="kelasId">${DB.kelas.map(k => `<option value="${k.id}">${k.nama}</option>`).join('')}</select></div>
+              <div class="field"><label>Status</label><select name="status"><option>Aktif</option><option>Lulus</option><option>Pindah</option></select></div>
+            </div>
+            <div class="btn-row"><button class="btn btn-primary" type="submit">💾 Simpan Siswa</button></div>
+          </form>
+        </div>
+        <div class="card">
+          <h3>📋 Daftar Siswa</h3>
+          <div class="table-wrap"><table><thead><tr><th>NISN</th><th>Nama</th><th>Kelas</th><th>Aksi</th></tr></thead>
+          <tbody>${DB.siswa.map(s => `<tr><td>${esc(s.nisn)}</td><td>${esc(s.nama)}</td><td>${esc(nKelas(s.kelasId))}</td><td><button class="btn btn-danger btn-sm" onclick="deleteData('siswa','${s.id}')">Hapus</button></td></tr>`).join('')}</tbody></table></div>
+        </div>`;
+    }
+
+    function renderGuru() {
+      return `
+        <div class="card">
+          <h3>💼 Tambah Guru</h3>
+          <form onsubmit="submitForm(event, 'guru')">
+            <div class="form-grid">
+              <div class="field"><label>NUPTK</label><input name="nip" required></div>
+              <div class="field"><label>Nama Lengkap</label><input name="nama" required></div>
+              <div class="field"><label>Mapel yang Diampu</label>
+                <select name="mapelId" required>
+                  <option value="">-- Pilih Mapel --</option>
+                  ${DB.mapel.map(m => `<option value="${m.id}">${m.nama}</option>`).join('')}
+                </select>
+              </div>
+              <div class="field"><label>Status</label><select name="status"><option>PNS</option><option>PPPK</option><option>GTT</option><option>Honorer</option></select></div>
+            </div>
+            <div class="btn-row"><button class="btn btn-primary" type="submit">💾 Simpan Guru</button></div>
+          </form>
+        </div>
+        <div class="card">
+          <h3>📋 Daftar Guru & Pegawai</h3>
+          <div class="table-wrap"><table><thead><tr><th>NUPTK</th><th>Nama</th><th>Mapel</th><th>Wali Kelas</th><th>Aksi</th></tr></thead>
+          <tbody>${DB.guru.map(g => {
+            const waliKelas = DB.kelas.find(k => k.waliKelasId === g.id);
+            return `<tr>
+              <td>${esc(g.nip)}</td>
+              <td>${esc(g.nama)}</td>
+              <td><b>${esc(nMapel(g.mapelId))}</b></td>
+              <td>${waliKelas ? `<span class="badge b-blue">${waliKelas.nama}</span>` : '-'}</td>
+              <td>
+                <button class="btn btn-primary btn-sm" onclick="editWaliKelas('${g.id}')">Set Wali Kelas</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteData('guru','${g.id}')">Hapus</button>
+              </td>
+            </tr>`;
+          }).join('')}</tbody></table></div>
+        </div>`;
+    }
+
+    window.editWaliKelas = async (guruId) => {
+      const guru = DB.guru.find(g => g.id === guruId);
+      const currentWali = DB.kelas.find(k => k.waliKelasId === guruId);
+      
+      const targetKelasId = prompt(`Pilih ID Kelas:\n(0 = Lepas Jabatan)\n\n${DB.kelas.map((k,i)=>`${i+1}. ${k.nama} (ID: ${k.id})`).join('\n')}`, currentWali ? (DB.kelas.findIndex(k => k.id === currentWali.id) + 1) : '0');
+      
+      if (targetKelasId === null) return;
+      const idx = parseInt(targetKelasId) - 1;
+
+      showLoading('Memproses...');
+      if (idx === -1) { 
+        for (let k of DB.kelas) {
+          if (k.waliKelasId === guruId) {
+            await apiCall('update', 'kelas', { id: k.id, data: { waliKelasId: '' } });
+            k.waliKelasId = ''; 
+          }
+        }
+        toast('Jabatan wali kelas dilepas');
+      } else {
+        const targetKelas = DB.kelas[idx];
+        if (!targetKelas) { hideLoading(); return alert('Pilihan tidak valid'); }
+        
+        const oldWali = DB.kelas.find(k => k.waliKelasId === guruId);
+        if (oldWali) {
+          await apiCall('update', 'kelas', { id: oldWali.id, data: { waliKelasId: '' } });
+          oldWali.waliKelasId = '';
+        }
+
+        await apiCall('update', 'kelas', { id: targetKelas.id, data: { waliKelasId: guruId } });
+        targetKelas.waliKelasId = guruId;
+        toast(`Guru dijadikan Wali Kelas ${targetKelas.nama}`);
+      }
+      hideLoading(); navigate('guru');
+    };
+
+    function renderAkademik() {
+      const tabs = ['kelas', 'jadwal', 'nilai', 'absensi']; 
+      return `<div class="card" style="padding:10px;"><div style="display:flex; gap:5px; flex-wrap:wrap;">
+        ${tabs.map(t => `<button class="btn ${currentSubTab === t ? 'btn-primary' : 'btn-secondary'}" onclick="activateSubTab('${t}')">${t.toUpperCase()}</button>`).join('')}
+      </div></div><div id="subContent"></div>`;
+    }
+
+    function activateSubTab(t) {
+      currentSubTab = t;
+      let html = '';
+      const isGuru = CURRENT_USER.role.toLowerCase().includes('guru');
+      const waliInfo = getMyWaliKelasInfo();
+      
+      let myGuruId = null;
+      if (isGuru || waliInfo) {
+        const firstName = CURRENT_USER.nama.split(' ')[0].toLowerCase(); 
+        const myGuru = DB.guru.find(g => g.nama.toLowerCase().includes(firstName));
+        if (myGuru) myGuruId = myGuru.id;
+      }
+
+      if (t === 'kelas') {
+        let tombolRapor = '';
+        if (!isGuru && !waliInfo) {
+          tombolRapor = `<button class="btn btn-danger" onclick="cetakRaporWaliKelas()">🖨️ Cetak Rapor Wali Kelas</button>`;
+        } else if (waliInfo) {
+          tombolRapor = `<button class="btn btn-danger" onclick="cetakRaporWaliKelas()">🖨️ Cetak Rapor Kelas ${waliInfo.kelasNama}</button>`;
+        }
+
+        let kelasToShow = DB.kelas;
+        if (waliInfo) kelasToShow = DB.kelas.filter(k => k.id === waliInfo.kelasId);
+
+        html = `
+          <div class="card">
+            <h3>Data Kelas</h3><div class="btn-row" style="margin-bottom:15px;">${tombolRapor}</div>
+            <div class="table-wrap"><table><thead><tr><th>Nama</th><th>Tingkat</th><th>Wali Kelas</th></tr></thead>
+            <tbody>${kelasToShow.map(k => `<tr><td>${esc(k.nama)}</td><td>${esc(k.tingkat)}</td><td>${esc(nGuru(k.waliKelasId))}</td></tr>`).join('')}</tbody></table></div>
+          </div>`;
+      } 
+      else if (t === 'jadwal') {
+        let jadwalToShow = DB.jadwal;
+        if (waliInfo) jadwalToShow = DB.jadwal.filter(j => j.kelasId === waliInfo.kelasId);
+        else if (isGuru && myGuruId) jadwalToShow = DB.jadwal.filter(j => j.guruId === myGuruId);
+        
+        html = `
+          <div class="card">
+            <h3>Jadwal ${waliInfo ? 'Kelas ' + waliInfo.kelasNama : (isGuru ? 'Mengajar Anda' : '')}</h3>
+            <div class="table-wrap"><table><thead><tr><th>Hari</th><th>Jam</th><th>Kelas</th><th>Mapel</th><th>Guru</th></tr></thead>
+            <tbody>${jadwalToShow.map(j => `<tr><td>${esc(j.hari)}</td><td><b>${esc(j.jamMulai)} - ${esc(j.jamSelesai)} WIB</b></td><td>${esc(nKelas(j.kelasId))}</td><td>${esc(nMapel(j.mapelId))}</td><td>${esc(nGuru(j.guruId))}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">Belum ada jadwal</td></tr>'}</tbody></table></div>
+          </div>`;
+      } 
+      else if (t === 'nilai') {
+        let filterMapel = DB.mapel, filterKelas = DB.kelas;
+        
+        if (isGuru || waliInfo) {
+          const myGuru = DB.guru.find(g => g.id === myGuruId);
+          if (myGuru) {
+            filterMapel = DB.mapel.filter(m => m.id === myGuru.mapelId);
+            let myKelasIds = DB.jadwal.filter(j => j.guruId === myGuruId).map(j => j.kelasId);
+            if (waliInfo) myKelasIds.push(waliInfo.kelasId);
+            filterKelas = DB.kelas.filter(k => [...new Set(myKelasIds)].includes(k.id));
+          } else {
+            filterMapel = [];
+          }
+        }
+
+        if (filterMapel.length === 0) {
+          html = `<div class="card"><h3>📝 Input Nilai</h3><p style="color:var(--danger)">Akun Anda belum terhubung dengan Mata Pelajaran.</p></div>`;
+        } else {
+          html = `
+            <div class="card">
+              <h3>📝 Input Nilai Kelas</h3>
+              <div class="form-grid">
+                <div class="field"><label>Mata Pelajaran</label><select id="inpMapel">${filterMapel.map(m => `<option value="${m.id}">${m.nama}</option>`).join('')}</select></div>
+                <div class="field"><label>Kelas</label><select id="inpKelas">${filterKelas.map(k => `<option value="${k.id}">${k.nama}</option>`).join('')}</select></div>
+                <div class="field"><label>Semester</label><select id="inpSem"><option>Ganjil</option><option>Genap</option></select></div>
+                <div class="field"><label>Jumlah Nilai Harian</label><select id="inpHarianCount"><option value="1">1 Kali</option><option value="2">2 Kali</option><option value="3" selected>3 Kali</option></select></div>
+              </div>
+              <div class="btn-row">
+                <button class="btn btn-primary" onclick="muatTabelNilai()">Tampilkan Siswa</button>
+                <button class="btn btn-danger" onclick="cetakPDFNilai()">🖨️ Cetak PDF Nilai (Mapel)</button>
+                ${waliInfo ? `<button class="btn btn-warning" onclick="cetakRekapNilaiSemesteran()">📊 Rekap Nilai Semesteran (Wali Kelas)</button>` : ''}
+              </div>
+            </div>
+            <div id="tabelNilaiContainer"></div>
+          `;
+        }
+      }
+      else if (t === 'absensi') {
+        let filterMapel = DB.mapel, filterKelas = DB.kelas;
+        
+        if (isGuru || waliInfo) {
+          const myGuru = DB.guru.find(g => g.id === myGuruId);
+          if (myGuru) {
+            filterMapel = DB.mapel.filter(m => m.id === myGuru.mapelId);
+            let myKelasIds = DB.jadwal.filter(j => j.guruId === myGuruId).map(j => j.kelasId);
+            if (waliInfo) myKelasIds.push(waliInfo.kelasId);
+            filterKelas = DB.kelas.filter(k => [...new Set(myKelasIds)].includes(k.id));
+          } else {
+            filterMapel = [];
+          }
+        }
+
+        if (filterMapel.length === 0) {
+          html = `<div class="card"><h3>✅ Absensi</h3><p style="color:var(--danger)">Akun Anda belum terhubung dengan Mata Pelajaran.</p></div>`;
+        } else {
+          html = `
+            <div class="card" style="padding:10px;">
+              <div style="display:flex; gap:5px;">
+                <button class="btn ${subTabAbsensi === 'input' ? 'btn-primary' : 'btn-secondary'}" onclick="subTabAbsensi='input'; activateSubTab('absensi')">Input Absensi</button>
+                <button class="btn ${subTabAbsensi === 'rekap' ? 'btn-primary' : 'btn-secondary'}" onclick="subTabAbsensi='rekap'; activateSubTab('absensi')">Rekap Absensi</button>
+              </div>
+            </div>
+          `;
+          if (subTabAbsensi === 'input') {
+            html += `
+              <div class="card">
+                <h3>Input Absensi per Mapel</h3>
+                <div class="form-grid">
+                  <div class="field"><label>Mata Pelajaran</label><select id="inpAbsenMapel">${filterMapel.map(m => `<option value="${m.id}">${m.nama}</option>`).join('')}</select></div>
+                  <div class="field"><label>Kelas</label><select id="inpAbsenKelas">${filterKelas.map(k => `<option value="${k.id}">${k.nama}</option>`).join('')}</select></div>
+                  <div class="field"><label>Tanggal</label><input type="date" id="inpAbsenTgl" value="${new Date().toISOString().slice(0,10)}"></div>
+                </div>
+                <div class="btn-row"><button class="btn btn-primary" onclick="muatTabelAbsensi()">Tampilkan Siswa</button></div>
+              </div>
+              <div id="tabelAbsensiContainer"></div>
+            `;
+          } else {
+            html += `
+              <div class="card">
+                <h3>Rekap Absensi Harian</h3>
+                <div class="toolbar" style="display:flex; gap:10px; margin-bottom:15px; flex-wrap:wrap;">
+                  <select id="rekapAbsenKelas" class="btn btn-secondary" onchange="renderRekapAbsensi()">${filterKelas.map(k => `<option value="${k.id}">${k.nama}</option>`).join('')}</select>
+                  <select id="rekapAbsenMapel" class="btn btn-secondary" onchange="renderRekapAbsensi()">${filterMapel.map(m => `<option value="${m.id}">${m.nama}</option>`).join('')}</select>
+                  <button class="btn btn-danger" onclick="cetakPDFAbsensi()">🖨️ Cetak PDF Absensi</button>
+                </div>
+                <div id="rekapAbsenContainer"></div>
+              </div>
+            `;
+          }
+        }
+      }
+      $('#content').innerHTML = renderAkademik() + `<div id="subContent">${html}</div>`;
+      if (t === 'absensi' && subTabAbsensi === 'rekap') renderRekapAbsensi();
+    }
+
+    // ==========================================
+    // NILAI & ABSENSI LOGIC
+    // ==========================================
+    window.muatTabelNilai = () => {
+      const mapelId = document.getElementById('inpMapel').value;
+      const kelasId = document.getElementById('inpKelas').value;
+      const semester = document.getElementById('inpSem').value;
+      const jmlHarian = parseInt(document.getElementById('inpHarianCount').value);
+      const siswaList = DB.siswa.filter(s => s.kelasId === kelasId);
+      if (siswaList.length === 0) return document.getElementById('tabelNilaiContainer').innerHTML = '<div class="card"><p class="empty" style="text-align:center;">Tidak ada siswa.</p></div>';
+
+      let tableHtml = `<div class="card"><h3>Daftar Nilai: ${nMapel(mapelId)} - ${nKelas(kelasId)}</h3><div class="table-wrap"><table><thead><tr><th>Nama Siswa</th>${Array.from({length: jmlHarian}, (_, i) => `<th>H${i+1}</th>`).join('')}<th>UTS</th><th>UAS</th><th>Akhir</th></tr></thead><tbody>`;
+      siswaList.forEach(siswa => {
+        const existing = DB.nilai.find(n => n.siswaId === siswa.id && n.mapelId === mapelId && n.semester === semester && n.tahunAjaran === TAHUN_AJARAN_AKTIF);
+        let harianArr = existing && existing.harian ? String(existing.harian).split(',').map(Number) : [];
+        const uts = existing && existing.uts ? existing.uts : '';
+        const uas = existing && existing.uas ? existing.uas : '';
+        tableHtml += `<tr data-siswa="${siswa.id}" data-nilai-id="${existing ? existing.id : ''}"><td>${siswa.nama}</td>`;
+        for (let i = 0; i < jmlHarian; i++) tableHtml += `<td><input type="number" class="nilai-input inp-nilai" data-type="harian" value="${harianArr[i] !== undefined ? harianArr[i] : ''}"></td>`;
+        tableHtml += `<td><input type="number" class="nilai-input inp-nilai" data-type="uts" value="${uts}"></td><td><input type="number" class="nilai-input inp-nilai" data-type="uas" value="${uas}"></td><td><b class="nilai-akhir-text">-</b></td></tr>`;
+      });
+      tableHtml += `</tbody></table></div><div class="btn-row"><button class="btn btn-success" onclick="simpanSemuaNilai('${mapelId}', '${kelasId}', '${semester}')">💾 Simpan Nilai (Bulk)</button></div></div>`;
+      document.getElementById('tabelNilaiContainer').innerHTML = tableHtml;
+      document.querySelectorAll('.inp-nilai').forEach(inp => inp.addEventListener('input', (e) => hitungNilaiAkhirRow(e.target.closest('tr'))));
+      document.querySelectorAll('#tabelNilaiContainer tbody tr').forEach(tr => hitungNilaiAkhirRow(tr));
+    };
+
+    function hitungNilaiAkhirRow(tr) {
+      let totalHarian = 0, countHarian = 0, uts = 0, uas = 0;
+      tr.querySelectorAll('.inp-nilai').forEach(inp => {
+        const val = parseFloat(inp.value) || 0;
+        if (inp.dataset.type === 'harian') { totalHarian += val; countHarian++; }
+        else if (inp.dataset.type === 'uts') uts = val;
+        else if (inp.dataset.type === 'uas') uas = val;
+      });
+      tr.querySelector('.nilai-akhir-text').textContent = Math.round((((countHarian > 0 ? totalHarian / countHarian : 0) + uts + uas) / 3) * 100) / 100;
+    }
+
+    window.simpanSemuaNilai = async (mapelId, kelasId, semester) => {
+      const rows = document.querySelectorAll('#tabelNilaiContainer tbody tr');
+      showLoading('Menyimpan...'); 
+      const payload = [];
+      
+      for (const tr of rows) {
+        const siswaId = tr.dataset.siswa, nilaiId = tr.dataset.nilaiId;
+        let harianArr = [], uts = 0, uas = 0;
+        tr.querySelectorAll('.inp-nilai').forEach(inp => {
+          if (inp.dataset.type === 'harian') harianArr.push(inp.value === '' ? 0 : Number(inp.value));
+          else if (inp.dataset.type === 'uts') uts = inp.value === '' ? 0 : Number(inp.value);
+          else if (inp.dataset.type === 'uas') uas = inp.value === '' ? 0 : Number(inp.value);
+        });
+        payload.push({ id: nilaiId, siswaId, mapelId, semester, tahunAjaran: TAHUN_AJARAN_AKTIF, harian: harianArr.join(','), uts, uas });
+      }
+
+      try {
+        await apiCall('bulkSave', 'nilai', { data: payload });
+        toast('Nilai berhasil disimpan!');
+        const res = await apiCall('getAllData'); DB = { ...DB, ...res.data };
+        muatTabelNilai();
+      } catch (e) { toast(e.message, 'error'); } finally { hideLoading(); }
+    };
+
+    window.muatTabelAbsensi = () => {
+      const mapelId = document.getElementById('inpAbsenMapel').value;
+      const kelasId = document.getElementById('inpAbsenKelas').value;
+      const tanggal = document.getElementById('inpAbsenTgl').value;
+      const siswaList = DB.siswa.filter(s => s.kelasId === kelasId);
+      if (siswaList.length === 0) return document.getElementById('tabelAbsensiContainer').innerHTML = '<div class="card"><p class="empty" style="text-align:center;">Tidak ada siswa.</p></div>';
+
+      let tableHtml = `<div class="card"><h3>Absensi ${nKelas(kelasId)} - ${nMapel(mapelId)} (${tanggal})</h3><div class="table-wrap"><table><thead><tr><th>Nama Siswa</th><th>Status</th><th>Keterangan</th></tr></thead><tbody>`;
+      siswaList.forEach(siswa => {
+        const existing = DB.absensi.find(a => a.siswaId === siswa.id && a.mapelId === mapelId && a.tanggal === tanggal);
+        const status = existing ? existing.status : 'Hadir';
+        const ket = existing ? existing.keterangan : '';
+        tableHtml += `<tr data-siswa="${siswa.id}" data-absen-id="${existing ? existing.id : ''}"><td><b>${siswa.nama}</b></td>
+          <td><select class="inp-absen-status" style="width:100px;"><option value="Hadir" ${status==='Hadir'?'selected':''}>Hadir</option><option value="Sakit" ${status==='Sakit'?'selected':''}>Sakit</option><option value="Izin" ${status==='Izin'?'selected':''}>Izin</option><option value="Alfa" ${status==='Alfa'?'selected':''}>Alfa</option></select></td>
+          <td><input type="text" class="inp-absen-ket" value="${ket}" placeholder="Opsional"></td></tr>`;
+      });
+      tableHtml += `</tbody></table></div><div class="btn-row"><button class="btn btn-success" onclick="simpanSemuaAbsensi('${mapelId}', '${tanggal}')">💾 Simpan Absensi (Bulk)</button></div></div>`;
+      document.getElementById('tabelAbsensiContainer').innerHTML = tableHtml;
+    };
+
+    window.simpanSemuaAbsensi = async (mapelId, tanggal) => {
+      const rows = document.querySelectorAll('#tabelAbsensiContainer tbody tr');
+      showLoading('Menyimpan...'); 
+      const payload = [];
+      
+      for (const tr of rows) {
+        const siswaId = tr.dataset.siswa, absenId = tr.dataset.absenId;
+        const status = tr.querySelector('.inp-absen-status').value;
+        const keterangan = tr.querySelector('.inp-absen-ket').value;
+        payload.push({ id: absenId, siswaId, mapelId, tanggal, status, keterangan });
+      }
+
+      try {
+        await apiCall('bulkSave', 'absensi', { data: payload });
+        toast('Absensi berhasil disimpan!');
+        const res = await apiCall('getAllData'); DB = { ...DB, ...res.data };
+        muatTabelAbsensi();
+      } catch (e) { toast(e.message, 'error'); } finally { hideLoading(); }
+    };
+
+    window.renderRekapAbsensi = () => {
+      const kelasId = document.getElementById('rekapAbsenKelas').value;
+      const mapelId = document.getElementById('rekapAbsenMapel').value;
+      const siswaList = DB.siswa.filter(s => s.kelasId === kelasId);
+      const absensiMapel = DB.absensi.filter(a => a.mapelId === mapelId && siswaList.some(s => s.id === a.siswaId));
+      const tanggalList = [...new Set(absensiMapel.map(a => a.tanggal))].sort();
+      if (tanggalList.length === 0) return document.getElementById('rekapAbsenContainer').innerHTML = '<p class="empty" style="text-align:center;">Belum ada data absensi.</p>';
+
+      let tableHtml = `<div class="table-wrap"><table><thead><tr><th>Nama Siswa</th>${tanggalList.map(t => `<th>${t.split('-').reverse().join('/')}</th>`).join('')}</tr></thead><tbody>`;
+      siswaList.forEach(siswa => {
+        tableHtml += `<tr><td><b>${siswa.nama}</b></td>`;
+        tanggalList.forEach(tgl => {
+          const record = DB.absensi.find(a => a.siswaId === siswa.id && a.mapelId === mapelId && a.tanggal === tgl);
+          let badge = '-';
+          if (record) {
+            const color = record.status === 'Hadir' ? 'b-green' : record.status === 'Alfa' ? 'b-red' : 'b-yellow';
+            badge = `<span class="badge ${color}">${record.status.charAt(0)}</span>`;
+          }
+          tableHtml += `<td style="text-align:center;">${badge}</td>`;
+        });
+        tableHtml += `</tr>`;
+      });
+      tableHtml += `</tbody></table></div><div class="hint" style="margin-top:10px;">Keterangan: H=Hadir, S=Sakit, I=Izin, A=Alfa</div>`;
+      document.getElementById('rekapAbsenContainer').innerHTML = tableHtml;
+    };
+
+    function renderAdmin() {
+      return `
+        <div class="card">
+          <h3>⚙️ Pengaturan Identitas & Sistem</h3>
+          <form onsubmit="simpanPengaturan(event)">
+            <div class="form-grid">
+              <div class="field"><label>Nama Yayasan</label><input name="namaYayasan" value="${getVal('namaYayasan', '')}"></div>
+              <div class="field"><label>Nama Sekolah</label><input name="namaSekolah" value="${getVal('namaSekolah', '')}"></div>
+              <div class="field"><label>Akreditasi</label><input name="akreditasi" value="${getVal('akreditasi', '')}"></div>
+              <div class="field"><label>Alamat Lengkap</label><input name="alamat" value="${getVal('alamat', '')}"></div>
+              <div class="field"><label>Kontak (Telp / Email)</label><input name="kontak" value="${getVal('kontak', '')}"></div>
+              <div class="field"><label>URL Logo Sekolah</label><input name="logo" value="${getVal('logo', '')}" placeholder="https://..."></div>
+              <div class="field"><label>Nama Kepala Sekolah</label><input name="kepsek" value="${getVal('kepsek', '')}"></div>
+              <div class="field"><label>NRKS Kepala Sekolah</label><input name="nrksKepsek" value="${getVal('nrksKepsek', '')}"></div>
+              <div class="field"><label>Tahun Ajaran Aktif</label><input name="tahunAjaranAktif" value="${TAHUN_AJARAN_AKTIF}"></div>
+            </div>
+            <div class="btn-row"><button class="btn btn-primary" type="submit">💾 Simpan Pengaturan</button></div>
+          </form>
+        </div>`;
+    }
+
+    window.simpanPengaturan = async (e) => {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(e.target).entries());
+      showLoading('Menyimpan pengaturan...');
+      for (const [key, value] of Object.entries(data)) {
+        const existing = DB.pengaturan.find(p => p.key === key);
+        if (existing) {
+          if (existing.value !== value) {
+            await apiCall('update', 'pengaturan', { id: existing.id, data: { value } });
+            existing.value = value; 
+          }
+        } else {
+          const res = await apiCall('create', 'pengaturan', { data: { key, value } });
+          DB.pengaturan.push(res.data);
+        }
+      }
+      TAHUN_AJARAN_AKTIF = getVal('tahunAjaranAktif', TAHUN_AJARAN_AKTIF);
+      hideLoading(); toast('Pengaturan disimpan!'); navigate('administrasi');
+    };
+
+    // ==========================================
+    // KASUS & JURNAL
+    // ==========================================
+    function renderKasus() {
+      const isGuru = CURRENT_USER.role.toLowerCase().includes('guru');
+      const waliInfo = getMyWaliKelasInfo();
+      let myGuruId = null;
+      let filterMapel = DB.mapel;
+      let filterKelas = DB.kelas;
+      let kasusToShow = DB.kasus;
+
+      if (isGuru || waliInfo) {
+        const firstName = CURRENT_USER.nama.split(' ')[0].toLowerCase(); 
+        const myGuru = DB.guru.find(g => g.nama.toLowerCase().includes(firstName));
+        if (myGuru) {
+          myGuruId = myGuru.id;
+          filterMapel = DB.mapel.filter(m => m.id === myGuru.mapelId);
+          
+          let myKelasIds = DB.jadwal.filter(j => j.guruId === myGuruId).map(j => j.kelasId);
+          if (waliInfo) myKelasIds.push(waliInfo.kelasId);
+          filterKelas = DB.kelas.filter(k => [...new Set(myKelasIds)].includes(k.id));
+
+          if (waliInfo) {
+            const mySiswaIds = DB.siswa.filter(s => s.kelasId === waliInfo.kelasId).map(s => s.id);
+            kasusToShow = DB.kasus.filter(k => mySiswaIds.includes(k.siswaId));
+          } else {
+            kasusToShow = DB.kasus.filter(k => k.mapelId === myGuru.mapelId);
+          }
+        } else {
+          filterMapel = [];
+        }
+      }
+
+      const defaultKelasId = filterKelas.length > 0 ? filterKelas[0].id : '';
+      const defaultSiswaList = DB.siswa.filter(s => s.kelasId === defaultKelasId);
+
+      return `
+        <div class="card">
+          <h3>⚠️ ${editKasusId ? 'Edit' : 'Tambah'} Kasus</h3>
+          <form onsubmit="submitKasus(event)">
+            <input type="hidden" name="id" id="kasusId" value="${editKasusId || ''}">
+            <div class="form-grid">
+              <div class="field"><label>Kelas</label>
+                <select id="kasusKelas" onchange="updateSiswaKasus()" required>
+                  ${filterKelas.map(k => `<option value="${k.id}">${k.nama}</option>`).join('')}
+                </select>
+              </div>
+              <div class="field"><label>Mata Pelajaran</label>
+                <select name="mapelId" id="kasusMapel" required>
+                  ${filterMapel.map(m => `<option value="${m.id}">${m.nama}</option>`).join('')}
+                </select>
+              </div>
+              <div class="field"><label>Nama Siswa</label>
+                <select name="siswaId" id="kasusSiswa" required>
+                  ${defaultSiswaList.map(s => `<option value="${s.id}">${s.nama}</option>`).join('')}
+                </select>
+              </div>
+              <div class="field"><label>Tanggal</label><input type="date" name="tanggal" id="kasusTgl" required value="${new Date().toISOString().slice(0,10)}"></div>
+              <div class="field"><label>Judul Kasus</label><input name="judul" id="kasusJudul" required></div>
+              <div class="field" style="grid-column:1/-1"><label>Deskripsi / Kronologi</label><textarea name="deskripsi" id="kasusDesk"></textarea></div>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-primary" type="submit">💾 Simpan</button>
+              ${editKasusId ? `<button class="btn btn-secondary" type="button" onclick="editKasusId=null; navigate('kasus')">Batal</button>` : ''}
+              <button class="btn btn-danger" type="button" onclick="cetakPDFKasus()">🖨️ Cetak PDF Kasus</button>
+            </div>
+          </form>
+        </div>
+        <div class="card">
+          <h3>📋 Daftar Kasus</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th style="text-align:center; width:100px;">Tanggal</th>
+                  <th style="text-align:center; width:80px;">Kelas</th>
+                  <th>Mata Pelajaran</th>
+                  <th>Nama Siswa</th>
+                  <th>Judul Kasus</th>
+                  <th style="text-align:center; width:100px;">Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${kasusToShow.map(k => `<tr>
+                  <td style="text-align:center;">${esc(k.tanggal)}</td>
+                  <td style="text-align:center;"><span class="badge b-blue">${esc(nKelas(DB.siswa.find(s => s.id === k.siswaId)?.kelasId))}</span></td>
+                  <td>${esc(nMapel(k.mapelId))}</td>
+                  <td><b>${esc(nSiswa(k.siswaId))}</b></td>
+                  <td>${esc(k.judul)}</td>
+                  <td style="text-align:center;">
+                    <button class="btn btn-sm btn-secondary" onclick="editKasus('${k.id}')">Edit</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteData('kasus','${k.id}')">Hapus</button>
+                  </td>
+                </tr>`).join('') || '<tr><td colspan="6" class="empty">Belum ada catatan kasus</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </div>`;
+    }
+
+    window.updateSiswaKasus = () => {
+      const kelasId = document.getElementById('kasusKelas').value;
+      const siswaList = DB.siswa.filter(s => s.kelasId === kelasId);
+      const selSiswa = document.getElementById('kasusSiswa');
+      selSiswa.innerHTML = siswaList.map(s => `<option value="${s.id}">${s.nama}</option>`).join('');
+    };
+
+    window.editKasus = (id) => {
+      editKasusId = id; navigate('kasus');
+      setTimeout(() => {
+        const k = DB.kasus.find(x => x.id === id);
+        if(k) {
+          document.getElementById('kasusMapel').value = k.mapelId;
+          document.getElementById('kasusTgl').value = k.tanggal;
+          document.getElementById('kasusJudul').value = k.judul;
+          document.getElementById('kasusDesk').value = k.deskripsi || '';
+          
+          const siswa = DB.siswa.find(s => s.id === k.siswaId);
+          if (siswa) {
+            document.getElementById('kasusKelas').value = siswa.kelasId;
+            updateSiswaKasus();
+            document.getElementById('kasusSiswa').value = k.siswaId;
+          }
+        }
+      }, 100);
+    };
+
+    async function submitKasus(e) {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(e.target).entries());
+      const id = data.id; delete data.id; data.status = 'Open';
+      showLoading('Menyimpan...');
+      if(id) {
+        await apiCall('update', 'kasus', { id, data });
+        const idx = DB.kasus.findIndex(x => x.id === id); if(idx>-1) DB.kasus[idx] = { id, ...data };
+      } else {
+        const res = await apiCall('create', 'kasus', { data });
+        DB.kasus.push(res.data);
+      }
+      editKasusId = null;
+      hideLoading(); toast('Kasus disimpan'); navigate('kasus');
+    }
+
+    function renderJurnal() {
+      const isGuru = CURRENT_USER.role.toLowerCase().includes('guru');
+      let filterMapel = DB.mapel;
+      
+      if (isGuru) {
+        const firstName = CURRENT_USER.nama.split(' ')[0].toLowerCase(); 
+        const myGuru = DB.guru.find(g => g.nama.toLowerCase().includes(firstName));
+        if (myGuru) filterMapel = DB.mapel.filter(m => m.id === myGuru.mapelId);
+      }
+
+      return `
+        <div class="card">
+          <h3>📓 ${editJurnalId ? 'Edit' : 'Tambah'} Jurnal</h3>
+          <form onsubmit="submitJurnal(event)">
+            <input type="hidden" name="id" id="jurnalId" value="${editJurnalId || ''}">
+            <div class="form-grid">
+              <div class="field"><label>Mata Pelajaran</label>
+                <select name="mapelId" id="jurnalMapel" required>
+                  ${filterMapel.map(m => `<option value="${m.id}">${m.nama}</option>`).join('')}
+                </select>
+              </div>
+              <div class="field"><label>Tanggal</label><input type="date" name="tanggal" id="jurnalTgl" required value="${new Date().toISOString().slice(0,10)}"></div>
+              <div class="field"><label>Judul / Materi</label><input name="judul" id="jurnalJudul" required></div>
+              <div class="field" style="grid-column:1/-1"><label>Isi Jurnal</label><textarea name="isi" id="jurnalIsi" required></textarea></div>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-primary" type="submit">💾 Simpan</button>
+              ${editJurnalId ? `<button class="btn btn-secondary" type="button" onclick="editJurnalId=null; navigate('jurnal')">Batal</button>` : ''}
+              <button class="btn btn-danger" type="button" onclick="cetakPDFJurnal()">🖨️ Cetak PDF Jurnal</button>
+            </div>
+          </form>
+        </div>
+        <div class="card">
+          <h3>📋 Daftar Jurnal</h3>
+          <div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Mapel</th><th>Judul</th><th>Aksi</th></tr></thead>
+          <tbody>${DB.jurnal.filter(j => !isGuru || filterMapel.some(m=>m.id===j.mapelId)).map(j => `<tr>
+            <td>${esc(j.tanggal)}</td><td>${esc(nMapel(j.mapelId))}</td><td>${esc(j.judul)}</td>
+            <td>
+              <button class="btn btn-sm btn-secondary" onclick="editJurnal('${j.id}')">Edit</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteData('jurnal','${j.id}')">Hapus</button>
+            </td>
+          </tr>`).join('')}</tbody></table></div>
+        </div>`;
+    }
+
+    window.editJurnal = (id) => {
+      editJurnalId = id; navigate('jurnal');
+      setTimeout(() => {
+        const j = DB.jurnal.find(x => x.id === id);
+        if(j) {
+          document.getElementById('jurnalMapel').value = j.mapelId;
+          document.getElementById('jurnalTgl').value = j.tanggal;
+          document.getElementById('jurnalJudul').value = j.judul;
+          document.getElementById('jurnalIsi').value = j.isi || '';
+        }
+      }, 100);
+    };
+
+    async function submitJurnal(e) {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(e.target).entries());
+      const id = data.id; delete data.id; data.jenis = 'Kegiatan'; 
+      showLoading('Menyimpan...');
+      if(id) {
+        await apiCall('update', 'jurnal', { id, data });
+        const idx = DB.jurnal.findIndex(x => x.id === id); if(idx>-1) DB.jurnal[idx] = { id, ...data };
+      } else {
+        const res = await apiCall('create', 'jurnal', { data });
+        DB.jurnal.push(res.data);
+      }
+      editJurnalId = null;
+      hideLoading(); toast('Jurnal disimpan'); navigate('jurnal');
+    }
+
+    // ==========================================
+    // CETAK PDF (SISTEM LAMA)
+    // ==========================================
+    window.cetakRekapNilaiSemesteran = () => {
+      const waliInfo = getMyWaliKelasInfo();
+      if (!waliInfo) return alert('Anda bukan Wali Kelas.');
+
+      const semester = prompt('Masukkan Semester (Ganjil/Genap):', 'Ganjil');
+      if (!semester) return;
+
+      const siswaList = DB.siswa.filter(s => s.kelasId === waliInfo.kelasId);
+      const mapelList = DB.mapel;
+      
+      let studentScores = siswaList.map(siswa => {
+        let total = 0;
+        let mapelScores = mapelList.map(m => {
+          const n = DB.nilai.find(x => x.siswaId === siswa.id && x.mapelId === m.id && x.semester === semester && x.tahunAjaran === TAHUN_AJARAN_AKTIF);
+          const val = n ? nilaiAkhir(n) : 0; 
+          total += val;
+          return { val, hasScore: !!n };
+        });
+        let avg = mapelList.length > 0 ? (total / mapelList.length) : 0;
+        return { siswa, total, avg, mapelScores };
+      });
+
+      studentScores.sort((a, b) => b.avg - a.avg);
+
+      let tableRows = '';
+      studentScores.forEach((item, idx) => {
+        let nilaiHtml = item.mapelScores.map(ms => `<td style="text-align:center;">${ms.hasScore ? ms.val : '-'}</td>`).join('');
+        tableRows += `<tr>
+          <td style="text-align:center;">${idx + 1}</td>
+          <td>${item.siswa.nama}</td>
+          ${nilaiHtml}
+          <td style="text-align:center;"><b>${item.total.toFixed(2)}</b></td>
+          <td style="text-align:center;"><b>${item.avg.toFixed(2)}</b></td>
+          <td style="text-align:center;"><b>${idx + 1}</b></td>
+        </tr>`;
+      });
+
+      const win = window.open('', '_blank');
+      win.document.write(`
+        <html><head><title>Rekap Nilai Semesteran</title>
+        <style>
+          body{font-family:sans-serif;padding:20px; font-size:11px;} 
+          table{width:100%;border-collapse:collapse;margin-top:20px;} 
+          th,td{border:1px solid #000;padding:6px;} 
+          th{background:#eee;}
+        </style></head>
+        <body onload="window.print()">
+          ${getKopSurat()}
+          <h3 style="text-align:center; text-decoration:underline;">REKAP NILAI SEMESTERAN</h3>
+          <p style="text-align:center; margin-bottom:20px;">Kelas: ${waliInfo.kelasNama} | Semester: ${semester} | Tahun Ajaran: ${TAHUN_AJARAN_AKTIF}</p>
+          <table>
+            <thead>
+              <tr>
+                <th rowspan="2" style="text-align:center; vertical-align:middle;">No</th>
+                <th rowspan="2" style="vertical-align:middle;">Nama Siswa</th>
+                <th colspan="${mapelList.length}" style="text-align:center;">Nilai Mata Pelajaran</th>
+                <th rowspan="2" style="text-align:center; vertical-align:middle;">Jumlah</th>
+                <th rowspan="2" style="text-align:center; vertical-align:middle;">Rata-rata</th>
+                <th rowspan="2" style="text-align:center; vertical-align:middle;">Rangking</th>
+              </tr>
+              <tr>
+                ${mapelList.map(m => `<th style="text-align:center;">${m.kode}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>${tableRows}</tbody>
+          </table>
+          ${getTandaTangan('wali')}
+        </body></html>
+      `);
+      win.document.close();
+    };
+
+    window.cetakPDFKasus = () => {
+      const waliInfo = getMyWaliKelasInfo();
+      let kasusToPrint = DB.kasus;
+      let isGuru = CURRENT_USER.role.toLowerCase().includes('guru');
+
+      if (waliInfo) {
+        const siswaIds = DB.siswa.filter(s => s.kelasId === waliInfo.kelasId).map(s => s.id);
+        kasusToPrint = DB.kasus.filter(k => siswaIds.includes(k.siswaId));
+      } else if (isGuru) {
+        const firstName = CURRENT_USER.nama.split(' ')[0].toLowerCase(); 
+        const myGuru = DB.guru.find(g => g.nama.toLowerCase().includes(firstName));
+        if (myGuru) kasusToPrint = DB.kasus.filter(k => k.mapelId === myGuru.mapelId);
+      }
+
+      const rows = kasusToPrint.map((k, i) => `<tr><td style="text-align:center;">${i+1}</td><td>${k.tanggal}</td><td>${nKelas(DB.siswa.find(s=>s.id===k.siswaId)?.kelasId)}</td><td>${nSiswa(k.siswaId)}</td><td>${nMapel(k.mapelId)}</td><td>${k.judul}</td><td>${k.deskripsi || '-'}</td></tr>`).join('');
+      const win = window.open('', '_blank');
+      win.document.write(`<html><head><title>Cetak Kasus</title><style>body{font-family:sans-serif;padding:30px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:8px;} th{background:#eee;}</style></head><body onload="window.print()">${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">LAPORAN CATATAN KASUS</h3><table><thead><tr><th>No</th><th>Tanggal</th><th>Kelas</th><th>Siswa</th><th>Mapel</th><th>Judul</th><th>Deskripsi</th></tr></thead><tbody>${rows}</tbody></table>${getTandaTangan('guru', document.getElementById('kasusMapel')?.value)}</body></html>`);
+      win.document.close();
+    };
+
+    window.cetakPDFJurnal = () => {
+      const rows = DB.jurnal.map((j, i) => `<tr><td style="text-align:center;">${i+1}</td><td>${j.tanggal}</td><td>${nMapel(j.mapelId)}</td><td>${j.judul}</td><td>${j.isi || '-'}</td></tr>`).join('');
+      const win = window.open('', '_blank');
+      win.document.write(`<html><head><title>Cetak Jurnal</title><style>body{font-family:sans-serif;padding:30px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:8px;} th{background:#eee;}</style></head><body onload="window.print()">${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">LAPORAN JURNAL KEGIATAN</h3><table><thead><tr><th>No</th><th>Tanggal</th><th>Mapel</th><th>Judul</th><th>Isi Jurnal</th></tr></thead><tbody>${rows}</tbody></table>${getTandaTangan('guru', document.getElementById('jurnalMapel')?.value)}</body></html>`);
+      win.document.close();
+    };
+
+    window.cetakPDFAbsensi = () => {
+      const kelasId = document.getElementById('rekapAbsenKelas').value;
+      const mapelId = document.getElementById('rekapAbsenMapel').value;
+      const tanggal = prompt('Masukkan tanggal absensi (YYYY-MM-DD):', new Date().toISOString().slice(0,10));
+      if (!tanggal) return;
+
+      const siswaList = DB.siswa.filter(s => s.kelasId === kelasId);
+      let rows = '', tH = 0, tS = 0, tI = 0, tA = 0;
+      
+      siswaList.forEach((siswa, idx) => {
+        const absen = DB.absensi.find(a => a.siswaId === siswa.id && a.mapelId === mapelId && a.tanggal === tanggal);
+        const status = absen ? absen.status : 'Alfa';
+        const ket = absen ? (absen.keterangan || '-') : 'Belum diabsen';
+        if (status === 'Hadir') tH++; else if (status === 'Sakit') tS++; else if (status === 'Izin') tI++; else tA++;
+        rows += `<tr><td style="text-align:center;">${idx+1}</td><td>${siswa.nis}</td><td>${siswa.nama}</td><td style="text-align:center;">${status}</td><td>${ket}</td></tr>`;
+      });
+
+      const win = window.open('', '_blank');
+      win.document.write(`<html><head><title>Absensi Harian</title><style>body{font-family:sans-serif;padding:30px; font-size:12px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:8px;} th{background:#eee;}</style></head><body onload="window.print()">${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">LAPORAN ABSENSI HARIAN</h3><p style="text-align:center; margin-bottom:20px;">Kelas: ${nKelas(kelasId)} - Mapel: ${nMapel(mapelId)} • Tanggal: ${tanggal.split('-').reverse().join(' ')}</p><table><thead><tr><th>No</th><th>NIS</th><th>Nama</th><th>Status</th><th>Keterangan</th></tr></thead><tbody>${rows}</tbody></table><div style="margin-top:20px;"><strong>Rekap:</strong> Hadir: ${tH} • Sakit: ${tS} • Izin: ${tI} • Alfa: ${tA} • Total: ${siswaList.length}</div>${getTandaTangan('guru', mapelId)}</body></html>`);
+      win.document.close();
+    };
+
+    window.cetakPDFNilai = () => {
+      const mapelId = document.getElementById('inpMapel').value;
+      const kelasId = document.getElementById('inpKelas').value;
+      const semester = document.getElementById('inpSem').value;
+      const jmlHarian = parseInt(document.getElementById('inpHarianCount').value);
+      const siswaList = DB.siswa.filter(s => s.kelasId === kelasId);
+      let tableRows = '';
+
+      siswaList.forEach((siswa, idx) => {
+        const existing = DB.nilai.find(n => n.siswaId === siswa.id && n.mapelId === mapelId && n.semester === semester && n.tahunAjaran === TAHUN_AJARAN_AKTIF);
+        let harianArr = existing && existing.harian ? String(existing.harian).split(',').map(Number) : [];
+        const uts = existing ? existing.uts : 0, uas = existing ? existing.uas : 0, akhir = existing ? nilaiAkhir(existing) : 0;
+        tableRows += `<tr><td style="text-align:center;">${idx+1}</td><td>${siswa.nama}</td>${Array.from({length: jmlHarian}).map((_, i) => `<td style="text-align:center;">${harianArr[i] || '-'}</td>`).join('')}<td style="text-align:center;">${uts||'-'}</td><td style="text-align:center;">${uas||'-'}</td><td style="text-align:center;"><b>${akhir}</b></td></tr>`;
+      });
+
+      const win = window.open('', '_blank');
+      win.document.write(`<html><head><title>Cetak Nilai</title><style>body{font-family:sans-serif;padding:30px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:8px;} th{background:#eee;}</style></head><body onload="window.print()">${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">LAPORAN NILAI SISWA</h3><p style="text-align:center; margin-bottom:20px;">Mapel: ${nMapel(mapelId)} | Kelas: ${nKelas(kelasId)} | Semester: ${semester} | TA: ${TAHUN_AJARAN_AKTIF}</p><table><thead><tr><th>No</th><th>Nama Siswa</th>${Array.from({length: jmlHarian}).map((_, i) => `<th>H${i+1}</th>`).join('')}<th>UTS</th><th>UAS</th><th>Akhir</th></tr></thead><tbody>${tableRows}</tbody></table>${getTandaTangan('guru', mapelId)}</body></html>`);
+      win.document.close();
+    };
+
+    window.cetakRaporWaliKelas = () => {
+      const waliInfo = getMyWaliKelasInfo();
+      let targetKelasId = waliInfo ? waliInfo.kelasId : prompt(`Pilih Kelas (ketik nama kelas persis):`, '');
+      
+      if (!targetKelasId) return;
+      if (!waliInfo) {
+        const kelas = DB.kelas.find(k => k.nama.toLowerCase() === targetKelasId.toLowerCase());
+        if(!kelas) return alert('Kelas tidak ditemukan');
+        targetKelasId = kelas.id;
+      }
+      
+      const semester = prompt('Masukkan Semester (Ganjil/Genap):', 'Ganjil');
+      if (!semester) return;
+
+      const siswaList = DB.siswa.filter(s => s.kelasId === targetKelasId).sort((a,b) => a.nama.localeCompare(b.nama));
+      const mapelList = DB.mapel;
+      let tableRows = '';
+
+      siswaList.forEach((siswa, idx) => {
+        let nilaiHtml = mapelList.map(m => {
+           const n = DB.nilai.find(x => x.siswaId === siswa.id && x.mapelId === m.id && x.semester === semester && x.tahunAjaran === TAHUN_AJARAN_AKTIF);
+           return `<td style="text-align:center;">${n ? nilaiAkhir(n) : '-'}</td>`;
+        }).join('');
+        const yearStart = TAHUN_AJARAN_AKTIF.split('/')[0];
+        const absensi = DB.absensi.filter(a => a.siswaId === siswa.id && a.tanggal.startsWith(yearStart));
+        const h = absensi.filter(a => a.status === 'Hadir').length, s = absensi.filter(a => a.status === 'Sakit').length, i = absensi.filter(a => a.status === 'Izin').length, a = absensi.filter(a => a.status === 'Alfa').length;
+        tableRows += `<tr><td style="text-align:center;">${idx+1}</td><td>${siswa.nama}</td>${nilaiHtml}<td style="text-align:center;">${h}</td><td style="text-align:center;">${s}</td><td style="text-align:center;">${i}</td><td style="text-align:center;">${a}</td></tr>`;
+      });
+
+      const win = window.open('', '_blank');
+      win.document.write(`<html><head><title>Rekap Rapor</title><style>body{font-family:sans-serif;padding:30px; font-size:12px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:6px;} th{background:#eee;}</style></head><body onload="window.print()">${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">REKAP RAPOR SISWA</h3><p style="text-align:center; margin-bottom:20px;">Kelas: ${nKelas(targetKelasId)} | Semester: ${semester} | TA: ${TAHUN_AJARAN_AKTIF}</p><table><thead><tr><th rowspan="2">No</th><th rowspan="2">Nama Siswa</th><th colspan="${mapelList.length}">Nilai Mapel</th><th colspan="4">Absensi</th></tr><tr>${mapelList.map(m => `<th>${m.kode}</th>`).join('')}<th>H</th><th>S</th><th>I</th><th>A</th></tr></thead><tbody>${tableRows}</tbody></table>${getTandaTangan('wali')}</body></html>`);
+      win.document.close();
+    };
+
+    function renderAgenda() {
+      const isAdmin = CURRENT_USER.role.toLowerCase().includes('admin');
+      let formHtml = '';
+      if (isAdmin) {
+        formHtml = `
+          <div class="card">
+            <h3>🗓️ Tambah Agenda (Admin)</h3>
+            <form onsubmit="submitAgenda(event)">
+              <div class="form-grid">
+                <div class="field"><label>Nama Kegiatan</label><input name="nama" required></div>
+                <div class="field"><label>Tanggal Mulai</label><input type="date" name="tanggalMulai" required></div>
+                <div class="field"><label>Tanggal Selesai</label><input type="date" name="tanggalSelesai" required></div>
+              </div>
+              <div class="btn-row"><button class="btn btn-primary" type="submit">💾 Simpan Agenda</button></div>
+            </form>
+          </div>`;
+      }
+      return formHtml + `
+        <div class="card">
+          <h3>📅 Daftar Agenda</h3>
+          <div class="table-wrap"><table><thead><tr><th>Mulai</th><th>Selesai</th><th>Kegiatan</th></tr></thead>
+          <tbody>${DB.agenda.map(a => `<tr><td>${esc(a.tanggalMulai)}</td><td>${esc(a.tanggalSelesai)}</td><td>${esc(a.nama)}</td></tr>`).join('') || '<tr><td colspan="3" class="empty">Belum ada</td></tr>'}</tbody></table></div>
+        </div>`;
+    }
+
+    async function submitAgenda(e) {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(e.target).entries());
+      showLoading('Menyimpan...');
+      try {
+        const res = await apiCall('create', 'agenda', { data });
+        DB.agenda.push(res.data);
+        toast('Agenda disimpan'); navigate('agenda');
+      } catch (err) { toast(err.message, 'error'); } finally { hideLoading(); }
+    }
+
+    async function submitForm(e, entity) {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(e.target).entries());
+      showLoading('Menyimpan...');
+      try {
+        const res = await apiCall('create', entity, { data });
+        DB[entity].push(res.data); 
+        toast('Data disimpan!'); navigate(entity);
+      } catch (err) { toast(err.message, 'error'); } finally { hideLoading(); }
+    }
+
+    async function deleteData(entity, id) {
+      if (!confirm('Hapus data ini?')) return;
+      showLoading('Menghapus...');
+      try {
+        await apiCall('delete', entity, { id });
+        DB[entity] = DB[entity].filter(x => x.id !== id); 
+        toast('Data terhapus'); navigate(entity);
+      } catch (err) { toast(err.message, 'error'); } finally { hideLoading(); }
+    }
+
+    document.getElementById('loginPassword').addEventListener('keypress', e => { if (e.key === 'Enter') doLogin(); });
+    window.doLogin = doLogin; window.doLogout = doLogout; window.navigate = navigate; window.activateSubTab = activateSubTab; window.submitForm = submitForm; window.deleteData = deleteData;
+  </script>
+</body>
+</html>
