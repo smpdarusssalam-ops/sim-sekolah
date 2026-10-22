@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Absensi Siswa</title>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #f0f0f0; min-height: 100vh; display: flex; justify-content: center; padding: 15px; }
+        .container { width: 100%; max-width: 900px; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; align-self: flex-start; }
+        .header { background: linear-gradient(135deg, #8e44ad, #6c3483); color: white; padding: 18px 20px; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 20px; }
+        .header small { display: block; font-size: 12px; opacity: 0.85; margin-top: 2px; }
+        .btn-admin { background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.5); padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; }
+        .btn-admin:hover { background: rgba(255,255,255,0.3); }
+        
+        .body { padding: 20px; }
+        
+        .status-bar { background: #f8f9fa; padding: 10px; border-radius: 8px; text-align: center; font-size: 13px; color: #555; margin-bottom: 15px; }
+        .status-bar strong { color: #8e44ad; }
+        .badge-mode { display: inline-block; padding: 4px 12px; border-radius: 20px; font-weight: bold; font-size: 12px; margin-left: 8px; }
+        .badge-masuk { background: #2ecc71; color: white; }
+        .badge-pulang { background: #e67e22; color: white; }
+        .badge-closed { background: #e74c3c; color: white; }
+        
+        .toggle-mode { display: flex; gap: 8px; margin-bottom: 15px; }
+        .toggle-btn { flex: 1; padding: 12px; border: 2px solid #8e44ad; background: white; color: #8e44ad; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+        .toggle-btn.active { background: #8e44ad; color: white; }
+        
+        .input-box { width: 100%; padding: 15px; font-size: 18px; text-align: center; border: 2px solid #2ecc71; border-radius: 8px; margin-bottom: 10px; outline: none; }
+        .input-box:disabled { background: #ecf0f1; border-color: #bdc3c7; }
+        .hint { font-size: 12px; color: #888; text-align: center; display: block; margin-bottom: 15px; }
+        
+        #reader { width: 100%; border-radius: 10px; overflow: hidden; border: 3px solid #8e44ad; background: #000; min-height: 250px; margin-bottom: 12px; }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; margin-bottom: 10px; }
+        .btn-start { background: #27ae60; color: white; }
+        .btn-stop { background: #e74c3c; color: white; }
+        
+        .result { margin-top: 15px; padding: 18px; border-radius: 10px; text-align: center; display: none; animation: slideIn 0.3s; }
+        @keyframes slideIn { from { opacity:0; transform: translateY(10px);} to {opacity:1;transform:translateY(0);} }
+        .result.success-masuk { background: #d5f4e6; border: 2px solid #2ecc71; }
+        .result.success-pulang { background: #fdebd0; border: 2px solid #e67e22; }
+        .result.error { background: #fadbd8; border: 2px solid #e74c3c; }
+        .result h2 { font-size: 20px; margin-bottom: 12px; }
+        .result.success-masuk h2 { color: #27ae60; }
+        .result.success-pulang h2 { color: #d35400; }
+        .result.error h2 { color: #c0392b; }
+        .info-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid rgba(0,0,0,0.08); font-size: 14px; }
+        .info-row:last-child { border-bottom: none; }
+        .info-row .label { color: #666; }
+        .info-row .value { font-weight: bold; color: #333; }
+        
+        .live-section { margin-top: 25px; padding-top: 20px; border-top: 3px dashed #ddd; }
+        .live-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .live-header h3 { font-size: 16px; color: #8e44ad; display: flex; align-items: center; gap: 8px; }
+        .live-dot { width: 10px; height: 10px; background: #e74c3c; border-radius: 50%; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+        .live-count { font-size: 12px; color: #888; background: #f0f0f0; padding: 4px 10px; border-radius: 12px; }
+        .live-feed { max-height: 350px; overflow-y: auto; border: 2px solid #eee; border-radius: 8px; background: #fafafa; }
+        .feed-item { padding: 10px 12px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13px; }
+        .feed-item:last-child { border-bottom: none; }
+        .feed-item.new { animation: highlight 2s; }
+        @keyframes highlight { 0%{background:#fff3cd;} 100%{background:transparent;} }
+        .feed-info { flex: 1; min-width: 0; }
+        .feed-name { font-weight: bold; color: #2c3e50; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .feed-meta { font-size: 11px; color: #888; margin-top: 2px; }
+        .feed-time { text-align: right; font-family: monospace; font-size: 13px; }
+        .feed-time .masuk { color: #27ae60; font-weight: bold; display: block; }
+        .feed-time .pulang { color: #e67e22; font-weight: bold; display: block; }
+        .feed-empty { padding: 30px 20px; text-align: center; color: #999; font-size: 13px; }
+        .live-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+        .live-stat { background: #f8f9fa; border-radius: 8px; padding: 10px; text-align: center; }
+        .live-stat .num { font-size: 20px; font-weight: bold; }
+        .live-stat .lbl { font-size: 11px; color: #888; margin-top: 2px; }
+        .live-stat.green .num { color: #27ae60; }
+        .live-stat.orange .num { color: #e67e22; }
+        .live-stat.red .num { color: #e74c3c; }
+        
+        .admin-view { display: none; }
+        .login-box { max-width: 350px; margin: 40px auto; padding: 25px; background: #f8f9fa; border-radius: 12px; text-align: center; }
+        .login-box h3 { color: #8e44ad; margin-bottom: 20px; }
+        .login-box input { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 15px; margin-bottom: 12px; text-align: center; }
+        .login-box button { width: 100%; padding: 12px; background: #8e44ad; color: white; border: none; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; }
+        .err-msg { color: #e74c3c; font-size: 13px; margin-bottom: 10px; display: none; }
+        
+        .dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }
+        .dash-header h3 { margin: 0; color: #8e44ad; }
+        .btn-logout { padding: 8px 16px; background: #e74c3c; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; }
+        
+        .tabs { display: flex; border-bottom: 2px solid #eee; margin-bottom: 20px; flex-wrap: wrap; }
+        .tab { padding: 10px 20px; cursor: pointer; font-weight: bold; color: #888; border-bottom: 3px solid transparent; font-size: 14px; }
+        .tab.active { color: #8e44ad; border-bottom-color: #8e44ad; }
+        
+        .filter-group { display: flex; gap: 8px; margin-bottom: 15px; align-items: center; flex-wrap: wrap; }
+        .filter-group label { font-size: 13px; color: #555; }
+        .filter-group input, .filter-group select { padding: 8px 12px; border: 2px solid #ddd; border-radius: 6px; font-size: 14px; }
+        .btn-primary { padding: 9px 16px; background: #3498db; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; }
+        .btn-pdf { padding: 9px 16px; background: #e74c3c; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; }
+        .btn-excel { padding: 9px 16px; background: #27ae60; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; }
+        
+        .loading { text-align: center; padding: 20px; color: #888; font-style: italic; display: none; }
+        .info-msg { padding: 12px; border-radius: 8px; margin-top: 12px; display: none; font-size: 13px; }
+        .info-msg.ok { background: #d4edda; color: #155724; }
+        .info-msg.err { background: #f8d7da; color: #721c24; }
+        .info-msg a { color: inherit; font-weight: bold; }
+        
+        table.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        table.data-table th, table.data-table td { padding: 8px; text-align: left; border-bottom: 1px solid #eee; }
+        table.data-table th { background: #f8f9fa; font-weight: bold; position: sticky; top: 0; }
+        table.data-table tr:hover { background: #fafafa; }
+        
+        .table-wrap { max-height: 400px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px; }
+        .no-data { text-align: center; padding: 30px; color: #888; font-style: italic; display: none; }
+        
+        .config-warning { background: #fff3cd; color: #856404; padding: 15px; border-radius: 8px; margin-bottom: 15px; font-size: 13px; display: none; }
+        .config-warning code { background: #fff; padding: 2px 6px; border-radius: 4px; }
+        
+        .qr-toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 15px; padding: 12px; background: #f8f9fa; border-radius: 8px; }
+        .qr-toolbar label { font-size: 13px; color: #555; font-weight: bold; }
+        .qr-toolbar select { padding: 8px 12px; border: 2px solid #ddd; border-radius: 6px; font-size: 13px; }
+        .qr-toolbar .btn-sm { padding: 8px 14px; border: none; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; }
+        .btn-download-all { background: #e67e22; color: white; }
+        .btn-print-selected { background: #27ae60; color: white; }
+        .btn-select-all { background: #95a5a6; color: white; }
+        
+        .qr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
+        .qr-card { position: relative; background: white; border: 2px solid #e0e0e0; border-radius: 10px; padding: 12px; text-align: center; transition: all 0.2s; }
+        .qr-card:hover { border-color: #8e44ad; box-shadow: 0 4px 12px rgba(142,68,173,0.2); }
+        .qr-card.selected { border-color: #2ecc71; background: #eafaf1; }
+        .qr-card img { width: 100%; max-width: 160px; height: auto; display: block; margin: 0 auto 8px; }
+        .qr-card .qr-nama { font-weight: bold; font-size: 12px; color: #2c3e50; margin: 5px 0 3px; line-height: 1.2; min-height: 28px; }
+        .qr-card .qr-nis { font-size: 11px; color: #7f8c8d; font-family: monospace; }
+        .qr-card .qr-kelas { font-size: 10px; color: #8e44ad; font-weight: bold; margin-top: 3px; }
+        .qr-card .qr-actions { margin-top: 8px; display: flex; gap: 4px; justify-content: center; }
+        .qr-card .qr-actions button { font-size: 11px; padding: 5px 8px; border-radius: 4px; border: none; cursor: pointer; background: #3498db; color: white; font-weight: bold; }
+        .qr-card .qr-actions button.print-btn { background: #27ae60; }
+        .qr-card .qr-checkbox { position: absolute; top: 8px; left: 8px; width: 18px; height: 18px; cursor: pointer; }
+        
+        .download-progress { background: #fff3cd; color: #856404; padding: 12px; border-radius: 8px; margin-top: 10px; font-size: 13px; display: none; }
+        .download-progress .bar { height: 8px; background: #e0e0e0; border-radius: 4px; margin-top: 8px; overflow: hidden; }
+        .download-progress .bar-fill { height: 100%; background: #f39c12; transition: width 0.3s; width: 0%; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <div>
+            <h1 id="headerTitle">📋 Absensi Siswa</h1>
+            <small id="headerSub">RFID • Kamera QR</small>
+        </div>
+        <button class="btn-admin" id="btnAdminToggle" onclick="toggleAdmin()">🔐 Admin</button>
+    </div>
+    
+    <div class="body" id="absenView">
+        <div class="config-warning" id="configWarning">
+            ⚠️ <b>API_URL belum diisi!</b> Buka file <code>gerbang.html</code>, cari <code>const API_URL = "..."</code> dan isi dengan URL Web App Apps Script Anda.
+        </div>
+        
+        <div class="status-bar" id="statusBar">🕐 Memuat...</div>
+        
+        <div class="toggle-mode">
+            <button class="toggle-btn active" id="btnRFID" onclick="switchMode('rfid')">🔌 RFID</button>
+            <button class="toggle-btn" id="btnQR" onclick="switchMode('qr')">📷 Kamera QR</button>
+        </div>
+        
+        <div id="modeRFID">
+            <input type="text" id="rfidInput" class="input-box" placeholder="Scan Kartu RFID di sini" autofocus>
+            <span class="hint">Scan kartu RFID pada kotak di atas</span>
+        </div>
+        
+        <div id="modeQR" style="display:none;">
+            <div id="reader"></div>
+            <button class="btn btn-start" id="btnStart" onclick="startCamera()">▶️ Mulai Kamera</button>
+            <button class="btn btn-stop" id="btnStop" onclick="stopCamera()" style="display:none;">⏹️ Hentikan Kamera</button>
+            <span class="hint">Arahkan kamera ke QR Code siswa</span>
+        </div>
+        
+        <div class="result" id="resultBox"></div>
+        
+        <div class="live-section">
+            <div class="live-header">
+                <h3><span class="live-dot"></span> Absensi Hari Ini</h3>
+                <span class="live-count" id="liveCount">0 siswa</span>
+            </div>
+            
+            <div class="live-stats">
+                <div class="live-stat green"><div class="num" id="statMasuk">0</div><div class="lbl">Masuk</div></div>
+                <div class="live-stat orange"><div class="num" id="statPulang">0</div><div class="lbl">Pulang</div></div>
+                <div class="live-stat red"><div class="num" id="statBelum">0</div><div class="lbl">Belum</div></div>
+            </div>
+            
+            <div class="live-feed" id="liveFeed">
+                <div class="feed-empty">Memuat data absensi...</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="body admin-view" id="adminView">
+        <div id="loginSection">
+            <div class="login-box">
+                <h3>🔐 Login Admin</h3>
+                <div class="err-msg" id="loginErr">Password salah!</div>
+                <input type="password" id="passwordInput" placeholder="Masukkan Password" onkeypress="if(event.key==='Enter')doLogin()">
+                <button onclick="doLogin()">Masuk</button>
+            </div>
+        </div>
+        
+        <div id="dashboardSection" style="display:none;">
+            <div class="dash-header">
+                <h3>📊 Dashboard Admin</h3>
+                <button class="btn-logout" onclick="logout()">Logout</button>
+            </div>
+            
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('harian', this)">Harian</div>
+                <div class="tab" onclick="switchTab('bulanan', this)">Bulanan</div>
+                <div class="tab" onclick="switchTab('tahunan', this)">Tahunan</div>
+                <div class="tab" onclick="switchTab('qr', this)">QR Code</div>
+            </div>
+            
+            <div class="filter-group" id="filterHarian">
+                <label>Tanggal:</label>
+                <input type="date" id="inputTanggal">
+                <button class="btn-primary" onclick="loadHarian()">Tampilkan</button>
+                <button class="btn-pdf" onclick="exportLaporan('harian', 'pdf')">📄 PDF</button>
+                <button class="btn-excel" onclick="exportLaporan('harian', 'xlsx')">📊 Excel</button>
+            </div>
+            
+            <div class="filter-group" id="filterBulanan" style="display:none;">
+                <label>Bulan:</label>
+                <select id="inputBulan">
+                    <option value="1">Januari</option><option value="2">Februari</option>
+                    <option value="3">Maret</option><option value="4">April</option>
+                    <option value="5">Mei</option><option value="6">Juni</option>
+                    <option value="7">Juli</option><option value="8">Agustus</option>
+                    <option value="9">September</option><option value="10">Oktober</option>
+                    <option value="11">November</option><option value="12">Desember</option>
+                </select>
+                <label>Tahun:</label>
+                <input type="number" id="inputTahunBulanan" value="2024" style="width: 80px;">
+                <button class="btn-primary" onclick="loadBulanan()">Tampilkan</button>
+                <button class="btn-pdf" onclick="exportLaporan('bulanan', 'pdf')">📄 PDF</button>
+                <button class="btn-excel" onclick="exportLaporan('bulanan', 'xlsx')">📊 Excel</button>
+            </div>
+            
+            <div class="filter-group" id="filterTahunan" style="display:none;">
+                <label>Tahun:</label>
+                <input type="number" id="inputTahun" value="2024" style="width: 80px;">
+                <button class="btn-primary" onclick="loadTahunan()">Tampilkan</button>
+                <button class="btn-pdf" onclick="exportLaporan('tahunan', 'pdf')">📄 PDF</button>
+                <button class="btn-excel" onclick="exportLaporan('tahunan', 'xlsx')">📊 Excel</button>
+            </div>
+            
+            <div id="panelQR" style="display:none;">
+                <div class="qr-toolbar">
+                    <label>Kelas:</label>
+                    <select id="inputKelasQR" style="min-width:150px;">
+                        <option value="semua">Semua Kelas</option>
+                    </select>
+                    <button class="btn-sm btn-primary" onclick="loadQRCode()">🔄 Tampilkan</button>
+                    <button class="btn-sm btn-select-all" onclick="toggleSelectAll()">☑️ Pilih Semua</button>
+                    <button class="btn-sm btn-download-all" onclick="downloadSelectedQR()">⬇️ Download Terpilih</button>
+                    <button class="btn-sm btn-print-selected" onclick="printSelectedQR()">🖨️ Cetak Terpilih</button>
+                </div>
+                
+                <div class="info-msg" style="display:block; background:#e3f2fd; color:#0d47a1;">
+                    💡 <b>Cara pakai:</b> Centang siswa yang mau di-download, klik <b>Download Terpilih</b>. File PNG akan diunduh satu per satu.
+                </div>
+                
+                <div class="loading" id="loadingQR" style="display:none;">Memuat QR Code...</div>
+                
+                <div class="download-progress" id="downloadProgress">
+                    <span id="downloadProgressText">Mengunduh...</span>
+                    <div class="bar"><div class="bar-fill" id="downloadBarFill"></div></div>
+                </div>
+                
+                <div id="qrGrid" class="qr-grid"></div>
+                <p id="qrEmptyMsg" style="text-align:center; color:#7f8c8d; display:none; padding:20px;">
+                    Belum ada data siswa. Tambahkan di sheet "Siswa".
+                </p>
+            </div>
+            
+            <div class="info-msg" id="infoMsg"></div>
+            <div class="loading" id="loadingIndicator">Memuat data...</div>
+            
+            <div class="table-wrap" id="tableWrap" style="display:none;">
+                <table class="data-table">
+                    <thead>
+                        <tr><th>Tanggal</th><th>NIS</th><th>Nama</th><th>Kelas</th><th>Masuk</th><th>Pulang</th></tr>
+                    </thead>
+                    <tbody id="tbodyData"></tbody>
+                </table>
+            </div>
+            <div class="no-data" id="noDataMsg">Tidak ada data untuk periode ini.</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // =====================================================
+    // ⚠️ ISI URL WEB APP APPS SCRIPT DI SINI
+    // =====================================================
+    const API_URL = "URL_WEB_APP_ANDA_DI_SINI";
+    
+    if (API_URL.indexOf('URL_WEB_APP') !== -1) {
+        document.getElementById('configWarning').style.display = 'block';
+    }
+
+    // =====================================================
+    // STATE
+    // =====================================================
+    let currentMode = 'rfid';
+    let html5QrCode = null;
+    let isScanning = false;
+    let lastScan = '';
+    let lastTime = 0;
+    let adminLoggedIn = false;
+    let currentTab = 'harian';
+    let liveFeedInterval = null;
+    let lastFeedData = '';
+    let qrStudentsList = [];
+    let qrSelectedSet = {};
+
+    const rfidInput = document.getElementById('rfidInput');
+    document.getElementById('inputTanggal').valueAsDate = new Date();
+
+    // =====================================================
+    // API
+    // =====================================================
+    async function apiGet(params) {
+        const url = API_URL + '?' + new URLSearchParams(params).toString();
+        const res = await fetch(url);
+        return await res.json();
+    }
+    
+    async function apiPost(data) {
+        const res = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify(data)
+        });
+        return await res.json();
+    }
+
+    // =====================================================
+    // FORMAT
+    // =====================================================
+    function formatJam(jamStr) {
+        if (!jamStr || jamStr === '-') return '-';
+        var parts = jamStr.toString().split(':');
+        if (parts.length >= 2) return ('0' + parts[0]).slice(-2) + ':' + parts[1];
+        return jamStr;
+    }
+    
+    function formatTgl(tglStr) {
+        if (!tglStr) return '-';
+        const p = tglStr.split('-');
+        if (p.length !== 3) return tglStr;
+        return p[2] + '/' + p[1] + '/' + p[0];
+    }
+    
+    function escapeStr(s) {
+        return (s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    }
+
+    // =====================================================
+    // BUNYI BEEP & SUARA TTS
+    // =====================================================
+    let audioCtx = null;
+    function initAudio() {
+        if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){} }
+    }
+    function beep(freq, dur) {
+        initAudio();
+        if (!audioCtx) return;
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        try {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            gain.gain.value = 0.3;
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + dur);
+        } catch(e){}
+    }
+
+    let speechReady = false;
+    let suaraTersedia = null;
+    function initSpeech() {
+        if (speechReady) return;
+        if (!('speechSynthesis' in window)) return;
+        const voices = window.speechSynthesis.getVoices();
+        suaraTersedia = voices.find(v => v.lang === 'id-ID' || v.lang === 'id_ID') || 
+                        voices.find(v => v.lang && v.lang.indexOf('id') === 0) ||
+                        voices.find(v => v.lang && v.lang.indexOf('ms') === 0) || null;
+        speechReady = true;
+    }
+
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.onvoiceschanged = initSpeech;
+        initSpeech();
+    }
+
+    function ucapkanTerimaKasih(nama) {
+        if (!('speechSynthesis' in window)) return;
+        try {
+            window.speechSynthesis.cancel();
+            initSpeech();
+            const namaDepan = (nama || '').split(' ')[0];
+            const text = 'Terima kasih, ' + namaDepan;
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'id-ID';
+            utterance.rate = 1.0;
+            utterance.pitch = 1.1;
+            utterance.volume = 1.0;
+            if (suaraTersedia) utterance.voice = suaraTersedia;
+            window.speechSynthesis.speak(utterance);
+        } catch (e) { console.log('Error TTS:', e); }
+    }
+
+    document.addEventListener('click', function() {
+        initAudio(); initSpeech();
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    }, { once: true });
+
+    // =====================================================
+    // STATUS & LIVE FEED
+    // =====================================================
+    async function updateStatus() {
+        try {
+            const res = await apiGet({ action: 'status' });
+            if (!res.success) return;
+            const d = res.data;
+            let badge = '';
+            if (d.mode === 'masuk') badge = '<span class="badge-mode badge-masuk">ABSEN MASUK</span>';
+            else if (d.mode === 'pulang') badge = '<span class="badge-mode badge-pulang">ABSEN PULANG</span>';
+            else badge = '<span class="badge-mode badge-closed">DITUTUP</span>';
+            
+            document.getElementById('statusBar').innerHTML = 
+                '🕐 <strong>' + d.waktu + '</strong>' + badge +
+                '<br><small style="color:#888; font-size:11px;">Masuk: ' + d.jamMasukMulai + '-' + d.jamMasukSelesai + 
+                ' | Pulang: ' + d.jamPulangMulai + '-' + d.jamPulangSelesai + '</small>';
+        } catch (err) {
+            document.getElementById('statusBar').innerText = '❌ Gagal memuat status';
+        }
+    }
+    updateStatus();
+    setInterval(updateStatus, 30000);
+
+    async function loadLiveFeed() {
+        try {
+            const res = await apiGet({ action: 'absensi' });
+            const data = res.data || [];
+            const dataStr = JSON.stringify(data);
+            const isNew = lastFeedData !== '' && lastFeedData !== dataStr;
+            lastFeedData = dataStr;
+            
+            document.getElementById('liveCount').innerText = data.length + ' siswa';
+            
+            let sudahMasuk = 0, sudahPulang = 0;
+            data.forEach(d => {
+                if (d.jamMasuk && d.jamMasuk !== '-') sudahMasuk++;
+                if (d.jamPulang && d.jamPulang !== '-') sudahPulang++;
+            });
+            document.getElementById('statMasuk').innerText = sudahMasuk;
+            document.getElementById('statPulang').innerText = sudahPulang;
+            
+            const feed = document.getElementById('liveFeed');
+            if (!data || data.length === 0) {
+                feed.innerHTML = '<div class="feed-empty">Belum ada absensi hari ini</div>';
+                return;
+            }
+            
+            let html = '';
+            data.forEach((d, idx) => {
+                const isNewItem = isNew && idx === 0;
+                html += '<div class="feed-item' + (isNewItem ? ' new' : '') + '">' +
+                    '<div class="feed-info">' +
+                    '<div class="feed-name">' + d.nama + '</div>' +
+                    '<div class="feed-meta">' + d.nis + ' • ' + d.kelas + '</div>' +
+                    '</div>' +
+                    '<div class="feed-time">' +
+                    (d.jamMasuk && d.jamMasuk !== '-' ? '<span class="masuk">↗ ' + formatJam(d.jamMasuk) + '</span>' : '') +
+                    (d.jamPulang && d.jamPulang !== '-' ? '<span class="pulang">↙ ' + formatJam(d.jamPulang) + '</span>' : '') +
+                    '</div>' +
+                    '</div>';
+            });
+            feed.innerHTML = html;
+        } catch (err) {
+            document.getElementById('liveFeed').innerHTML = '<div class="feed-empty">Gagal memuat data</div>';
+        }
+    }
+    
+    async function updateRekap() {
+        try {
+            const res = await apiGet({ action: 'rekap' });
+            document.getElementById('statBelum').innerText = res.data.belumAbsen || 0;
+        } catch (err) {}
+    }
+    
+    function startLiveFeed() {
+        loadLiveFeed();
+        updateRekap();
+        if (liveFeedInterval) clearInterval(liveFeedInterval);
+        liveFeedInterval = setInterval(loadLiveFeed, 10000);
+    }
+    
+    function stopLiveFeed() {
+        if (liveFeedInterval) { clearInterval(liveFeedInterval); liveFeedInterval = null; }
+    }
+    
+    startLiveFeed();
+    setInterval(updateRekap, 30000);
+
+    // =====================================================
+    // MODE & KAMERA
+    // =====================================================
+    function switchMode(mode) {
+        currentMode = mode;
+        document.getElementById('btnRFID').classList.toggle('active', mode === 'rfid');
+        document.getElementById('btnQR').classList.toggle('active', mode === 'qr');
+        document.getElementById('modeRFID').style.display = (mode === 'rfid') ? 'block' : 'none';
+        document.getElementById('modeQR').style.display = (mode === 'qr') ? 'block' : 'none';
+        if (mode === 'rfid') {
+            stopCamera();
+            setTimeout(() => rfidInput.focus(), 100);
+        }
+    }
+
+    function startCamera() {
+        if (isScanning) return;
+        if (typeof Html5Qrcode === 'undefined') { alert('Library QR tidak termuat.'); return; }
+        
+        html5QrCode = new Html5Qrcode("reader");
+        isScanning = true;
+        document.getElementById('btnStart').style.display = 'none';
+        document.getElementById('btnStop').style.display = 'block';
+        
+        html5QrCode.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 250, height: 250 } },
+            function(text) {
+                const now = Date.now();
+                if (text === lastScan && (now - lastTime) < 3000) return;
+                lastScan = text;
+                lastTime = now;
+                beep(2000, 0.1);
+                prosesAbsen(text.trim());
+            },
+            function() {}
+        ).catch(function(err) {
+            isScanning = false;
+            document.getElementById('btnStart').style.display = 'block';
+            document.getElementById('btnStop').style.display = 'none';
+            alert('❌ Kamera tidak bisa diakses.\n\nError: ' + err);
+        });
+    }
+
+    function stopCamera() {
+        if (html5QrCode && isScanning) {
+            html5QrCode.stop().then(function() {
+                html5QrCode.clear();
+                isScanning = false;
+                document.getElementById('btnStart').style.display = 'block';
+                document.getElementById('btnStop').style.display = 'none';
+            }).catch(function() {
+                isScanning = false;
+                document.getElementById('btnStart').style.display = 'block';
+                document.getElementById('btnStop').style.display = 'none';
+            });
+        }
+    }
+
+    // =====================================================
+    // PROSES ABSEN
+    // =====================================================
+    rfidInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            const nis = rfidInput.value.trim();
+            if (nis) {
+                beep(2000, 0.1);
+                prosesAbsen(nis);
+                rfidInput.value = '';
+            }
+        }
+    });
+
+    document.addEventListener('click', function() {
+        if (currentMode === 'rfid' && document.getElementById('absenView').style.display !== 'none') {
+            rfidInput.focus();
+        }
+    });
+
+    async function prosesAbsen(nis) {
+        const resultBox = document.getElementById('resultBox');
+        resultBox.className = 'result';
+        resultBox.style.display = 'block';
+        resultBox.innerHTML = '<p>⏳ Memproses...</p>';
+        
+        try {
+            const res = await apiPost({ action: 'absen', nis: nis });
+            
+            if (res.success) {
+                const isMasuk = res.mode === 'masuk';
+                resultBox.className = 'result ' + (isMasuk ? 'success-masuk' : 'success-pulang');
+                
+                if (isMasuk) {
+                    beep(1200, 0.1); setTimeout(() => beep(1600, 0.15), 120);
+                } else {
+                    beep(900, 0.1); setTimeout(() => beep(1200, 0.15), 120);
+                }
+                
+                setTimeout(() => ucapkanTerimaKasih(res.siswa.nama), 350);
+                
+                resultBox.innerHTML = 
+                    '<h2>' + (isMasuk ? '✅ Absen Masuk Berhasil' : '👋 Absen Pulang Berhasil') + '</h2>' +
+                    '<div class="info-row"><span class="label">Nama</span><span class="value">' + res.siswa.nama + '</span></div>' +
+                    '<div class="info-row"><span class="label">NIS</span><span class="value">' + res.siswa.nis + '</span></div>' +
+                    '<div class="info-row"><span class="label">Kelas</span><span class="value">' + res.siswa.kelas + '</span></div>' +
+                    '<div class="info-row"><span class="label">Jam ' + (isMasuk ? 'Masuk' : 'Pulang') + '</span><span class="value">' + formatJam(res.jam) + '</span></div>';
+                
+                setTimeout(loadLiveFeed, 1000);
+                updateRekap();
+            } else {
+                beep(300, 0.4);
+                resultBox.className = 'result error';
+                resultBox.innerHTML = '<h2>❌ Gagal</h2><p>' + (res.message || res.error) + '</p>';
+            }
+        } catch (err) {
+            beep(300, 0.4);
+            resultBox.className = 'result error';
+            resultBox.innerHTML = '<h2>❌ Error</h2><p>' + err.message + '</p>';
+        }
+        
+        if (currentMode === 'rfid') rfidInput.focus();
+    }
+
+    // =====================================================
+    // ADMIN PANEL & LAPORAN
+    // =====================================================
+    function toggleAdmin() {
+        const absenView = document.getElementById('absenView');
+        const adminView = document.getElementById('adminView');
+        const btn = document.getElementById('btnAdminToggle');
+        
+        if (absenView.style.display === 'none') {
+            absenView.style.display = 'block';
+            adminView.style.display = 'none';
+            btn.innerText = '🔐 Admin';
+            document.getElementById('headerTitle').innerText = '📋 Absensi Siswa';
+            document.getElementById('headerSub').innerText = 'RFID • Kamera QR';
+            startLiveFeed();
+            if (currentMode === 'rfid') rfidInput.focus();
+        } else {
+            absenView.style.display = 'none';
+            adminView.style.display = 'block';
+            btn.innerText = '📋 Absen';
+            document.getElementById('headerTitle').innerText = '🔐 Admin Panel';
+            document.getElementById('headerSub').innerText = 'Dashboard & Laporan';
+            stopLiveFeed();
+            stopCamera();
+            
+            if (adminLoggedIn) {
+                document.getElementById('loginSection').style.display = 'none';
+                document.getElementById('dashboardSection').style.display = 'block';
+                loadHarian();
+            } else {
+                document.getElementById('loginSection').style.display = 'block';
+                document.getElementById('dashboardSection').style.display = 'none';
+                setTimeout(() => document.getElementById('passwordInput').focus(), 100);
+            }
+        }
+    }
+
+    async function doLogin() {
+        const pwd = document.getElementById('passwordInput').value;
+        const errBox = document.getElementById('loginErr');
+        errBox.style.display = 'none';
+        
+        try {
+            const res = await apiPost({ action: 'loginGerbang', password: pwd });
+            if (res.success) {
+                adminLoggedIn = true;
+                document.getElementById('loginSection').style.display = 'none';
+                document.getElementById('dashboardSection').style.display = 'block';
+                loadHarian();
+            } else {
+                errBox.innerText = res.message || 'Password salah';
+                errBox.style.display = 'block';
+            }
+        } catch (err) {
+            errBox.innerText = 'Error: ' + err.message;
+            errBox.style.display = 'block';
+        }
+    }
+
+    function logout() {
+        adminLoggedIn = false;
+        document.getElementById('passwordInput').value = '';
+        toggleAdmin();
+    }
+
+    function switchTab(tab, el) {
+        currentTab = tab;
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        el.classList.add('active');
+        document.getElementById('filterHarian').style.display = (tab === 'harian') ? 'flex' : 'none';
+        document.getElementById('filterBulanan').style.display = (tab === 'bulanan') ? 'flex' : 'none';
+        document.getElementById('filterTahunan').style.display = (tab === 'tahunan') ? 'flex' : 'none';
+        document.getElementById('panelQR').style.display = (tab === 'qr') ? 'block' : 'none';
+        document.getElementById('tableWrap').style.display = 'none';
+        document.getElementById('noDataMsg').style.display = 'none';
+        document.getElementById('infoMsg').style.display = 'none';
+        
+        if (tab === 'qr') {
+            loadDaftarKelas();
+            loadQRCode();
+        }
+    }
+
+    function renderTable(data) {
+        const tbody = document.getElementById('tbodyData');
+        tbody.innerHTML = '';
+        
+        if (!data || data.length === 0) {
+            document.getElementById('tableWrap').style.display = 'none';
+            document.getElementById('noDataMsg').style.display = 'block';
+            return;
+        }
+        
+        document.getElementById('noDataMsg').style.display = 'none';
+        document.getElementById('tableWrap').style.display = 'block';
+        
+        data.forEach(row => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = 
+                '<td>' + formatTgl(row.tanggal) + '</td>' +
+                '<td>' + row.nis + '</td>' +
+                '<td>' + row.nama + '</td>' +
+                '<td>' + row.kelas + '</td>' +
+                '<td style="color:#27ae60;font-weight:bold;">' + formatJam(row.jamMasuk) + '</td>' +
+                '<td style="color:#e67e22;font-weight:bold;">' + formatJam(row.jamPulang) + '</td>';
+            tbody.appendChild(tr);
+        });
+    }
+    
+    async function loadHarian() {
+        const tgl = document.getElementById('inputTanggal').value;
+        if (!tgl) return alert('Pilih tanggal!');
+        document.getElementById('loadingIndicator').style.display = 'block';
+        document.getElementById('tableWrap').style.display = 'none';
+        
+        try {
+            const res = await apiGet({ action: 'laporan', jenis: 'harian', tanggal: tgl });
+            document.getElementById('loadingIndicator').style.display = 'none';
+            renderTable(res.data || []);
+        } catch (err) {
+            document.getElementById('loadingIndicator').style.display = 'none';
+            alert('Error: ' + err.message);
+        }
+    }
+    
+    async function loadBulanan() {
+        const bln = document.getElementById('inputBulan').value;
+        const thn = document.getElementById('inputTahunBulanan').value;
+        document.getElementById('loadingIndicator').style.display = 'block';
+        document.getElementById('tableWrap').style.display = 'none';
+        
+        try {
+            const res = await apiGet({ action: 'laporan', jenis: 'bulanan', bulan: bln, tahun: thn });
+            document.getElementById('loadingIndicator').style.display = 'none';
+            renderTable(res.data || []);
+        } catch (err) {
+            document.getElementById('loadingIndicator').style.display = 'none';
+            alert('Error: ' + err.message);
+        }
+    }
+    
+    async function loadTahunan() {
+        const thn = document.getElementById('inputTahun').value;
+        document.getElementById('loadingIndicator').style.display = 'block';
+        document.getElementById('tableWrap').style.display = 'none';
+        
+        try {
+            const res = await apiGet({ action: 'laporan', jenis: 'tahunan', tahun: thn });
+            document.getElementById('loadingIndicator').style.display = 'none';
+            renderTable(res.data || []);
+        } catch (err) {
+            document.getElementById('loadingIndicator').style.display = 'none';
+            alert('Error: ' + err.message);
+        }
+    }
+
+    async function exportLaporan(jenis, format) {
+        const info = document.getElementById('infoMsg');
+        info.style.display = 'none';
+        document.getElementById('loadingIndicator').style.display = 'block';
+        document.getElementById('loadingIndicator').innerText = 'Membuat file ' + format.toUpperCase() + '...';
+        
+        let params = { action: 'export', jenis: jenis, format: format };
+        if (jenis === 'harian') params.tanggal = document.getElementById('inputTanggal').value;
+        else if (jenis === 'bulanan') { params.bulan = document.getElementById('inputBulan').value; params.tahun = document.getElementById('inputTahunBulanan').value; }
+        else if (jenis === 'tahunan') params.tahun = document.getElementById('inputTahun').value;
+        
+        try {
+            const res = await apiGet(params);
+            document.getElementById('loadingIndicator').style.display = 'none';
+            document.getElementById('loadingIndicator').innerText = 'Memuat data...';
+            
+            if (res.success) {
+                window.open(res.data.url, '_blank');
+                info.className = 'info-msg ok';
+                info.innerHTML = '✅ Laporan berhasil (' + res.data.totalData + ' data). <a href="' + res.data.url + '" target="_blank">Klik di sini jika tidak terunduh</a>.';
+                info.style.display = 'block';
+            } else {
+                info.className = 'info-msg err';
+                info.innerHTML = '❌ Gagal: ' + res.message;
+                info.style.display = 'block';
+            }
+        } catch (err) {
+            document.getElementById('loadingIndicator').style.display = 'none';
+            info.className = 'info-msg err';
+            info.innerHTML = '❌ Error: ' + err.message;
+            info.style.display = 'block';
+        }
+    }
+
+    // =====================================================
+    // QR CODE GENERATOR
+    // =====================================================
+    async function loadDaftarKelas() {
+        try {
+            const res = await apiGet({ action: 'kelas' });
+            if (!res.success) return;
+            const select = document.getElementById('inputKelasQR');
+            const cv = select.value;
+            select.innerHTML = '<option value="semua">Semua Kelas</option>';
+            (res.data || []).forEach(k => {
+                const opt = document.createElement('option');
+                opt.value = k;
+                opt.textContent = k;
+                select.appendChild(opt);
+            });
+            if (cv) select.value = cv;
+        } catch (err) { console.log('Load kelas error:', err); }
+    }
+
+    async function loadQRCode() {
+        const grid = document.getElementById('qrGrid');
+        const emptyMsg = document.getElementById('qrEmptyMsg');
+        const loading = document.getElementById('loadingQR');
+        
+        grid.innerHTML = '';
+        emptyMsg.style.display = 'none';
+        loading.style.display = 'block';
+        
+        const kelas = document.getElementById('inputKelasQR').value;
+        
+        try {
+            const res = await apiGet({ action: 'siswa', kelas: kelas });
+            loading.style.display = 'none';
+            
+            if (!res.success || !res.data || res.data.length === 0) {
+                emptyMsg.style.display = 'block';
+                return;
+            }
+            
+            qrStudentsList = res.data;
+            qrSelectedSet = {};
+            
+            res.data.forEach((siswa) => {
+                const card = document.createElement('div');
+                card.className = 'qr-card';
+                card.dataset.nis = siswa.nis;
+                
+                const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + 
+                              encodeURIComponent(siswa.nis) + '&margin=10';
+                
+                card.innerHTML = 
+                    '<input type="checkbox" class="qr-checkbox" onchange="toggleQrSelect(\'' + siswa.nis + '\', this)">' +
+                    '<img src="' + qrUrl + '" alt="QR ' + siswa.nis + '" loading="lazy" crossorigin="anonymous">' +
+                    '<div class="qr-nama">' + siswa.nama + '</div>' +
+                    '<div class="qr-nis">' + siswa.nis + '</div>' +
+                    '<div class="qr-kelas">' + siswa.kelas + '</div>' +
+                    '<div class="qr-actions">' +
+                    '<button onclick="downloadSingleQR(\'' + siswa.nis + '\', \'' + escapeStr(siswa.nama) + '\')">⬇️</button>' +
+                    '<button class="print-btn" onclick="printSingleQR(\'' + siswa.nis + '\', \'' + escapeStr(siswa.nama) + '\', \'' + escapeStr(siswa.kelas) + '\')">🖨️</button>' +
+                    '</div>';
+                
+                grid.appendChild(card);
+            });
+        } catch (err) {
+            loading.style.display = 'none';
+            alert('Error: ' + err.message);
+        }
+    }
+
+    function toggleQrSelect(nis, checkbox) {
+        if (checkbox.checked) qrSelectedSet[nis] = true;
+        else delete qrSelectedSet[nis];
+        const card = document.querySelector('.qr-card[data-nis="' + nis + '"]');
+        if (card) card.classList.toggle('selected', checkbox.checked);
+    }
+
+    function toggleSelectAll() {
+        const all = document.querySelectorAll('#qrGrid .qr-card');
+        const shouldSelect = Object.keys(qrSelectedSet).length < all.length;
+        qrSelectedSet = {};
+        all.forEach(card => {
+            const nis = card.dataset.nis;
+            const cb = card.querySelector('.qr-checkbox');
+            if (shouldSelect) {
+                qrSelectedSet[nis] = true;
+                cb.checked = true;
+                card.classList.add('selected');
+            } else {
+                cb.checked = false;
+                card.classList.remove('selected');
+            }
+        });
+    }
+
+    async function downloadSingleQR(nis, nama) {
+        const url = 'https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=' + encodeURIComponent(nis) + '&margin=10';
+        try {
+            const res = await fetch(url);
+            const blob = await res.blob();
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'QR_' + nis + '_' + nama.replace(/\s+/g, '_') + '.png';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+        } catch (err) { window.open(url, '_blank'); }
+    }
+
+    async function downloadSelectedQR() {
+        const nisArr = Object.keys(qrSelectedSet);
+        if (nisArr.length === 0) return alert('Pilih minimal 1 siswa terlebih dahulu.');
+        if (!confirm('Download ' + nisArr.length + ' QR Code?\n\nFile akan diunduh satu per satu.')) return;
+        
+        const prog = document.getElementById('downloadProgress');
+        const progText = document.getElementById('downloadProgressText');
+        const barFill = document.getElementById('downloadBarFill');
+        prog.style.display = 'block';
+        
+        for (let i = 0; i < nisArr.length; i++) {
+            const nis = nisArr[i];
+            const siswa = qrStudentsList.find(s => s.nis === nis);
+            if (!siswa) continue;
+            progText.innerText = 'Mengunduh ' + (i + 1) + ' / ' + nisArr.length + ': ' + siswa.nama;
+            barFill.style.width = ((i + 1) / nisArr.length * 100) + '%';
+            await downloadSingleQR(nis, siswa.nama);
+            await new Promise(r => setTimeout(r, 400));
+        }
+        progText.innerText = '✅ Selesai! ' + nisArr.length + ' file berhasil diunduh.';
+        setTimeout(() => { prog.style.display = 'none'; barFill.style.width = '0%'; }, 3000);
+    }
+
+    function printSingleQR(nis, nama, kelas) {
+        const url = 'https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=' + encodeURIComponent(nis) + '&margin=10';
+        const win = window.open('', '_blank');
+        win.document.write('<!DOCTYPE html><html><head><title>Cetak QR - ' + nama + '</title>' +
+            '<style>body{font-family:Arial;text-align:center;padding:30px;}.card{display:inline-block;padding:20px;border:3px solid #8e44ad;border-radius:15px;max-width:350px;}.card img{width:280px;height:280px;}.nama{font-size:18px;font-weight:bold;margin:10px 0 5px;}.nis{font-family:monospace;font-size:14px;color:#666;}.kelas{font-size:13px;color:#8e44ad;font-weight:bold;margin-top:5px;}.title{font-size:12px;color:#999;margin-bottom:15px;}@media print{@page{margin:10mm;}}</style></head><body>' +
+            '<div class="card"><div class="title">KARTU ABSENSI SISWA</div>' +
+            '<img src="' + url + '" onload="setTimeout(function(){window.print();},800)">' +
+            '<div class="nama">' + nama + '</div><div class="nis">' + nis + '</div><div class="kelas">' + kelas + '</div></div></body></html>');
+        win.document.close();
+    }
+
+    function printSelectedQR() {
+        const nisArr = Object.keys(qrSelectedSet);
+        if (nisArr.length === 0) return alert('Pilih minimal 1 siswa terlebih dahulu.');
+        
+        const win = window.open('', '_blank');
+        let html = '<!DOCTYPE html><html><head><title>Cetak Kartu QR</title><style>' +
+            'body{font-family:Arial;padding:10px;}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}' +
+            '.card{padding:8px;border:2px dashed #8e44ad;border-radius:8px;text-align:center;page-break-inside:avoid;}' +
+            '.card img{width:100%;max-width:160px;height:auto;}.nama{font-size:11px;font-weight:bold;margin:4px 0 2px;line-height:1.2;}' +
+            '.nis{font-family:monospace;font-size:10px;color:#666;}.kelas{font-size:9px;color:#8e44ad;font-weight:bold;}' +
+            '.header-title{text-align:center;margin-bottom:15px;font-size:14px;font-weight:bold;}' +
+            '@media print{@page{margin:8mm;size:A4;}}</style></head><body>' +
+            '<div class="header-title">KARTU ABSENSI SISWA - QR CODE</div><div class="grid">';
+        
+        nisArr.forEach(nis => {
+            const siswa = qrStudentsList.find(s => s.nis === nis);
+            if (!siswa) return;
+            const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(nis) + '&margin=10';
+            html += '<div class="card"><img src="' + qrUrl + '" crossorigin="anonymous">' +
+                '<div class="nama">' + siswa.nama + '</div><div class="nis">' + siswa.nis + '</div><div class="kelas">' + siswa.kelas + '</div></div>';
+        });
+        
+        html += '</div></body></html>';
+        win.document.write(html);
+        win.document.close();
+        setTimeout(() => win.print(), 1500);
+    }
+</script>
+</body>
+</html>
