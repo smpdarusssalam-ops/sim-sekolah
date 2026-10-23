@@ -1097,69 +1097,74 @@ function getTandaTangan(role = 'guru', mapelId = null) {
     // CETAK PDF MENGGUNAKAN IFRAME (ANTI POPUP)
     // ==========================================
     window.cetakPDFKasus = () => {
-      try {
-        const isGuru = CURRENT_USER.role.toLowerCase().includes('guru');
-        const waliInfo = getMyWaliKelasInfo();
-        let kasusToPrint = DB.kasus;
-        
-        if (waliInfo) {
-          const siswaIds = DB.siswa.filter(s => s.kelasId === waliInfo.kelasId).map(s => s.id);
-          kasusToPrint = DB.kasus.filter(k => siswaIds.includes(k.siswaId));
-        } else if (isGuru) {
-          const myGuru = DB.guru.find(g => g.nama && g.nama.trim().toLowerCase() === CURRENT_USER.nama.trim().toLowerCase());
-          if (myGuru) kasusToPrint = DB.kasus.filter(k => k.mapelId === myGuru.mapelId);
-        }
+  try {
+    const isGuru = CURRENT_USER.role.toLowerCase().includes('guru');
+    const waliInfo = getMyWaliKelasInfo();
+    let kasusToPrint = DB.kasus;
+    
+    if (waliInfo) {
+      const siswaIds = DB.siswa.filter(s => s.kelasId === waliInfo.kelasId).map(s => s.id);
+      kasusToPrint = DB.kasus.filter(k => siswaIds.includes(k.siswaId));
+    } else if (isGuru) {
+      const myGuru = DB.guru.find(g => g.nama && g.nama.trim().toLowerCase() === CURRENT_USER.nama.trim().toLowerCase());
+      if (myGuru) kasusToPrint = DB.kasus.filter(k => k.mapelId === myGuru.mapelId);
+    }
 
-        const rows = kasusToPrint.map((k, i) => `<tr><td style="text-align:center;">${i+1}</td><td>${k.tanggal}</td><td>${nSiswa(k.siswaId)}</td><td>${nMapel(k.mapelId)}</td><td>${k.judul}</td><td>${k.deskripsi || '-'}</td></tr>`).join('');
-        const html = `<html><head><title>Cetak Kasus</title><style>body{font-family:sans-serif;padding:30px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:8px;} th{background:#eee;}</style></head><body>${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">LAPORAN CATATAN KASUS</h3><table><thead><tr><th>No</th><th>Tanggal</th><th>Siswa</th><th>Mapel</th><th>Judul</th><th>Deskripsi</th></tr></thead><tbody>${rows}</tbody></table>${getTandaTangan('guru')}</body></html>`;
-        
-        printHTML(html);
-      } catch (e) { alert("Error cetak: " + e.message); }
-    };
-
+    // Gunakan formatTanggalIndo di sini
+    const rows = kasusToPrint.map((k, i) => `<tr><td style="text-align:center;">${i+1}</td><td>${formatTanggalIndo(k.tanggal)}</td><td>${nSiswa(k.siswaId)}</td><td>${nMapel(k.mapelId)}</td><td>${k.judul}</td><td>${k.deskripsi || '-'}</td></tr>`).join('');
+    
+    const html = `<html><head><title>Cetak Kasus</title><style>body{font-family:sans-serif;padding:30px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:8px;} th{background:#eee;}</style></head><body>${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">LAPORAN CATATAN KASUS</h3><table><thead><tr><th>No</th><th>Tanggal</th><th>Siswa</th><th>Mapel</th><th>Judul</th><th>Deskripsi</th></tr></thead><tbody>${rows}</tbody></table>${getTandaTangan('guru')}</body></html>`;
+    
+    printHTML(html);
+  } catch (e) { alert("Error cetak: " + e.message); }
+};
     window.cetakPDFJurnal = () => {
-      try {
-        const isGuru = CURRENT_USER.role.toLowerCase().includes('guru');
-        let jurnalToPrint = DB.jurnal;
-        if (isGuru) {
-          const myGuru = DB.guru.find(g => g.nama && g.nama.trim().toLowerCase() === CURRENT_USER.nama.trim().toLowerCase());
-          if (myGuru) jurnalToPrint = DB.jurnal.filter(j => j.mapelId === myGuru.mapelId);
-        }
+  try {
+    const isGuru = CURRENT_USER.role.toLowerCase().includes('guru');
+    let jurnalToPrint = DB.jurnal;
+    if (isGuru) {
+      const myGuru = DB.guru.find(g => g.nama && g.nama.trim().toLowerCase() === CURRENT_USER.nama.trim().toLowerCase());
+      if (myGuru) jurnalToPrint = DB.jurnal.filter(j => j.mapelId === myGuru.mapelId);
+    }
 
-        const rows = jurnalToPrint.map((j, i) => `<tr><td style="text-align:center;">${i+1}</td><td>${j.tanggal}</td><td>${nMapel(j.mapelId)}</td><td>${j.judul}</td><td>${j.isi || '-'}</td></tr>`).join('');
-        const html = `<html><head><title>Cetak Jurnal</title><style>body{font-family:sans-serif;padding:30px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:8px;} th{background:#eee;}</style></head><body>${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">LAPORAN JURNAL KEGIATAN</h3><table><thead><tr><th>No</th><th>Tanggal</th><th>Mapel</th><th>Judul</th><th>Isi Jurnal</th></tr></thead><tbody>${rows}</tbody></table>${getTandaTangan('guru')}</body></html>`;
-        
-        printHTML(html);
-      } catch (e) { alert("Error cetak: " + e.message); }
-    };
+    // Gunakan formatTanggalIndo di sini
+    const rows = jurnalToPrint.map((j, i) => `<tr><td style="text-align:center;">${i+1}</td><td>${formatTanggalIndo(j.tanggal)}</td><td>${nMapel(j.mapelId)}</td><td>${j.judul}</td><td>${j.isi || '-'}</td></tr>`).join('');
+    
+    const html = `<html><head><title>Cetak Jurnal</title><style>body{font-family:sans-serif;padding:30px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:8px;} th{background:#eee;}</style></head><body>${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">LAPORAN JURNAL KEGIATAN</h3><table><thead><tr><th>No</th><th>Tanggal</th><th>Mapel</th><th>Judul</th><th>Isi Jurnal</th></tr></thead><tbody>${rows}</tbody></table>${getTandaTangan('guru')}</body></html>`;
+    
+    printHTML(html);
+  } catch (e) { alert("Error cetak: " + e.message); }
+};
 
     window.cetakPDFAbsensi = () => {
-      try {
-        const kelasId = document.getElementById('rekapAbsenKelas').value;
-        const mapelId = document.getElementById('rekapAbsenMapel').value;
-        
-        const now = new Date();
-        const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-        const tanggal = prompt('Masukkan tanggal absensi (YYYY-MM-DD):', today);
-        if (!tanggal) return;
+  try {
+    const kelasId = document.getElementById('rekapAbsenKelas').value;
+    const mapelId = document.getElementById('rekapAbsenMapel').value;
+    
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    const tanggal = prompt('Masukkan tanggal absensi (YYYY-MM-DD):', today);
+    if (!tanggal) return;
 
-        const siswaList = DB.siswa.filter(s => s.kelasId === kelasId);
-        let rows = '', tH = 0, tS = 0, tI = 0, tA = 0;
-        
-        siswaList.forEach((siswa, idx) => {
-          const absen = DB.absensi.find(a => a.siswaId === siswa.id && a.mapelId === mapelId && a.tanggal === tanggal);
-          const status = absen ? absen.status : 'Alfa';
-          const ket = absen ? (absen.keterangan || '-') : 'Belum diabsen';
-          if (status === 'Hadir') tH++; else if (status === 'Sakit') tS++; else if (status === 'Izin') tI++; else tA++;
-          rows += `<tr><td style="text-align:center;">${idx+1}</td><td>${siswa.nis}</td><td>${siswa.nama}</td><td style="text-align:center;">${status}</td><td>${ket}</td></tr>`;
-        });
+    const siswaList = DB.siswa.filter(s => s.kelasId === kelasId);
+    let rows = '', tH = 0, tS = 0, tI = 0, tA = 0;
+    
+    siswaList.forEach((siswa, idx) => {
+      const absen = DB.absensi.find(a => a.siswaId === siswa.id && a.mapelId === mapelId && a.tanggal === tanggal);
+      const status = absen ? absen.status : 'Alfa';
+      const ket = absen ? (absen.keterangan || '-') : 'Belum diabsen';
+      if (status === 'Hadir') tH++; else if (status === 'Sakit') tS++; else if (status === 'Izin') tI++; else tA++;
+      rows += `<tr><td style="text-align:center;">${idx+1}</td><td>${siswa.nis}</td><td>${siswa.nama}</td><td style="text-align:center;">${status}</td><td>${ket}</td></tr>`;
+    });
 
-        const html = `<html><head><title>Absensi Harian</title><style>body{font-family:sans-serif;padding:30px; font-size:12px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:8px;} th{background:#eee;}</style></head><body>${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">LAPORAN ABSENSI HARIAN</h3><p style="text-align:center; margin-bottom:20px;">Kelas: ${nKelas(kelasId)} - Mapel: ${nMapel(mapelId)} • Tanggal: ${tanggal.split('-').reverse().join(' ')}</p><table><thead><tr><th>No</th><th>NIS</th><th>Nama</th><th>Status</th><th>Keterangan</th></tr></thead><tbody>${rows}</tbody></table><div style="margin-top:20px;"><strong>Rekap:</strong> Hadir: ${tH} • Sakit: ${tS} • Izin: ${tI} • Alfa: ${tA} • Total: ${siswaList.length}</div>${getTandaTangan('guru', mapelId)}</body></html>`;
-        
-        printHTML(html);
-      } catch (e) { alert("Error cetak: " + e.message); }
-    };
+    // Rapikan format tanggal di judul
+    const tanggalTeks = formatTanggalIndo(tanggal);
 
+    const html = `<html><head><title>Absensi Harian</title><style>body{font-family:sans-serif;padding:30px; font-size:12px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:8px;} th{background:#eee;}</style></head><body>${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">LAPORAN ABSENSI HARIAN</h3><p style="text-align:center; margin-bottom:20px;">Kelas: ${nKelas(kelasId)} - Mapel: ${nMapel(mapelId)} • Tanggal: ${tanggalTeks}</p><table><thead><tr><th>No</th><th>NIS</th><th>Nama</th><th>Status</th><th>Keterangan</th></tr></thead><tbody>${rows}</tbody></table><div style="margin-top:20px;"><strong>Rekap:</strong> Hadir: ${tH} • Sakit: ${tS} • Izin: ${tI} • Alfa: ${tA} • Total: ${siswaList.length}</div>${getTandaTangan('guru', mapelId)}</body></html>`;
+    
+    printHTML(html);
+  } catch (e) { alert("Error cetak: " + e.message); }
+};
     window.cetakPDFNilai = () => {
       try {
         const mapelId = document.getElementById('inpMapel').value;
