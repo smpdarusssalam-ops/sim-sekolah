@@ -1315,7 +1315,21 @@
         hideLoading(); 
       }
     }
-
+window.submitAgenda = async (e) => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target).entries());
+  showLoading('Menyimpan agenda...');
+  try {
+    const res = await apiCall('create', 'agenda', { data });
+    DB.agenda.push(res.data);
+    toast('Agenda berhasil disimpan!'); 
+    navigate('agenda');
+  } catch (err) { 
+    toast(err.message, 'error'); 
+  } finally { 
+    hideLoading(); 
+  }
+};
     document.getElementById('loginPassword').addEventListener('keypress', e => { if (e.key === 'Enter') doLogin(); });
     window.doLogin = doLogin; window.doLogout = doLogout; window.navigate = navigate; window.activateSubTab = activateSubTab; window.submitForm = submitForm; window.deleteData = deleteData;
   </script>
