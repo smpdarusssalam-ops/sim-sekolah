@@ -180,6 +180,31 @@
     function hideLoading() { $('#loadingOverlay').classList.remove('show'); }
 
     // ==========================================
+    // FUNGSI CETAK (ANTI POP-UP BLOCKER)
+    // ==========================================
+    function printHTML(html) {
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.width = '0px';
+      iframe.style.height = '0px';
+      iframe.style.border = 'none';
+      document.body.appendChild(iframe);
+      
+      const doc = iframe.contentWindow.document;
+      doc.open();
+      doc.write(html);
+      doc.close();
+      
+      // Beri waktu sebentar agar HTML ter-render sebelum print
+      setTimeout(() => {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+        // Hapus iframe setelah selesai (opsional, tapi disarankan)
+        setTimeout(() => document.body.removeChild(iframe), 1000);
+      }, 500);
+    }
+
+    // ==========================================
     // API CALL
     // ==========================================
     function apiCall(action, entity, payload = {}) {
@@ -579,7 +604,7 @@
     }
 
     // ==========================================
-    // LOGIKA KASUS & JURNAL (DIPERBARUI)
+    // LOGIKA KASUS & JURNAL
     // ==========================================
     function renderKasus() {
       const isGuru = CURRENT_USER.role.toLowerCase().includes('guru');
@@ -594,14 +619,12 @@
         const myGuru = DB.guru.find(g => g.nama && g.nama.trim().toLowerCase() === CURRENT_USER.nama.trim().toLowerCase());
         if (myGuru) {
           myGuruId = myGuru.id;
-          // Filter Form: Guru hanya bisa input mapel yang diampu
           filterMapelForm = DB.mapel.filter(m => m.id === myGuru.mapelId);
           
           let myKelasIds = DB.jadwal.filter(j => j.guruId === myGuruId).map(j => j.kelasId);
           if (waliInfo) myKelasIds.push(waliInfo.kelasId);
           filterKelasForm = DB.kelas.filter(k => [...new Set(myKelasIds)].includes(k.id));
 
-          // Filter Tabel: Wali Kelas melihat semua kasus di kelasnya, Guru biasa melihat kasus mapelnya
           if (waliInfo) {
             const mySiswaIds = DB.siswa.filter(s => s.kelasId === waliInfo.kelasId).map(s => s.id);
             kasusToShow = DB.kasus.filter(k => mySiswaIds.includes(k.siswaId));
@@ -688,9 +711,7 @@
         const myGuru = DB.guru.find(g => g.nama && g.nama.trim().toLowerCase() === CURRENT_USER.nama.trim().toLowerCase());
         if (myGuru) {
           myGuruId = myGuru.id;
-          // Guru dan Wali Kelas hanya input mapel yang diampu
           filterMapelForm = DB.mapel.filter(m => m.id === myGuru.mapelId);
-          // Guru melihat jurnal mapelnya sendiri
           jurnalToShow = DB.jurnal.filter(j => j.mapelId === myGuru.mapelId);
         } else {
           filterMapelForm = [];
@@ -976,203 +997,204 @@
     }
 
     // ==========================================
-    // CETAK PDF (ANTI POPUP BLOCKER)
+    // CETAK PDF MENGGUNAKAN IFRAME (ANTI POPUP)
     // ==========================================
     window.cetakPDFKasus = () => {
-      const win = window.open('', '_blank');
-      if (!win) return alert('⚠️ Pop-up diblokir browser! Harap izinkan pop-up.');
-      const isGuru = CURRENT_USER.role.toLowerCase().includes('guru');
-      const waliInfo = getMyWaliKelasInfo();
-      let kasusToPrint = DB.kasus;
-      
-      if (waliInfo) {
-        const siswaIds = DB.siswa.filter(s => s.kelasId === waliInfo.kelasId).map(s => s.id);
-        kasusToPrint = DB.kasus.filter(k => siswaIds.includes(k.siswaId));
-      } else if (isGuru) {
-        const myGuru = DB.guru.find(g => g.nama && g.nama.trim().toLowerCase() === CURRENT_USER.nama.trim().toLowerCase());
-        if (myGuru) kasusToPrint = DB.kasus.filter(k => k.mapelId === myGuru.mapelId);
-      }
+      try {
+        const isGuru = CURRENT_USER.role.toLowerCase().includes('guru');
+        const waliInfo = getMyWaliKelasInfo();
+        let kasusToPrint = DB.kasus;
+        
+        if (waliInfo) {
+          const siswaIds = DB.siswa.filter(s => s.kelasId === waliInfo.kelasId).map(s => s.id);
+          kasusToPrint = DB.kasus.filter(k => siswaIds.includes(k.siswaId));
+        } else if (isGuru) {
+          const myGuru = DB.guru.find(g => g.nama && g.nama.trim().toLowerCase() === CURRENT_USER.nama.trim().toLowerCase());
+          if (myGuru) kasusToPrint = DB.kasus.filter(k => k.mapelId === myGuru.mapelId);
+        }
 
-      const rows = kasusToPrint.map((k, i) => `<tr><td style="text-align:center;">${i+1}</td><td>${k.tanggal}</td><td>${nSiswa(k.siswaId)}</td><td>${nMapel(k.mapelId)}</td><td>${k.judul}</td><td>${k.deskripsi || '-'}</td></tr>`).join('');
-      win.document.write(`<html><head><title>Cetak Kasus</title><style>body{font-family:sans-serif;padding:30px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:8px;} th{background:#eee;}</style></head><body onload="window.print()">${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">LAPORAN CATATAN KASUS</h3><table><thead><tr><th>No</th><th>Tanggal</th><th>Siswa</th><th>Mapel</th><th>Judul</th><th>Deskripsi</th></tr></thead><tbody>${rows}</tbody></table>${getTandaTangan('guru')}</body></html>`);
-      win.document.close();
+        const rows = kasusToPrint.map((k, i) => `<tr><td style="text-align:center;">${i+1}</td><td>${k.tanggal}</td><td>${nSiswa(k.siswaId)}</td><td>${nMapel(k.mapelId)}</td><td>${k.judul}</td><td>${k.deskripsi || '-'}</td></tr>`).join('');
+        const html = `<html><head><title>Cetak Kasus</title><style>body{font-family:sans-serif;padding:30px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:8px;} th{background:#eee;}</style></head><body>${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">LAPORAN CATATAN KASUS</h3><table><thead><tr><th>No</th><th>Tanggal</th><th>Siswa</th><th>Mapel</th><th>Judul</th><th>Deskripsi</th></tr></thead><tbody>${rows}</tbody></table>${getTandaTangan('guru')}</body></html>`;
+        
+        printHTML(html);
+      } catch (e) { alert("Error cetak: " + e.message); }
     };
 
     window.cetakPDFJurnal = () => {
-      const win = window.open('', '_blank');
-      if (!win) return alert('⚠️ Pop-up diblokir browser! Harap izinkan pop-up.');
-      
-      const isGuru = CURRENT_USER.role.toLowerCase().includes('guru');
-      let jurnalToPrint = DB.jurnal;
-      if (isGuru) {
-        const myGuru = DB.guru.find(g => g.nama && g.nama.trim().toLowerCase() === CURRENT_USER.nama.trim().toLowerCase());
-        if (myGuru) jurnalToPrint = DB.jurnal.filter(j => j.mapelId === myGuru.mapelId);
-      }
+      try {
+        const isGuru = CURRENT_USER.role.toLowerCase().includes('guru');
+        let jurnalToPrint = DB.jurnal;
+        if (isGuru) {
+          const myGuru = DB.guru.find(g => g.nama && g.nama.trim().toLowerCase() === CURRENT_USER.nama.trim().toLowerCase());
+          if (myGuru) jurnalToPrint = DB.jurnal.filter(j => j.mapelId === myGuru.mapelId);
+        }
 
-      const rows = jurnalToPrint.map((j, i) => `<tr><td style="text-align:center;">${i+1}</td><td>${j.tanggal}</td><td>${nMapel(j.mapelId)}</td><td>${j.judul}</td><td>${j.isi || '-'}</td></tr>`).join('');
-      win.document.write(`<html><head><title>Cetak Jurnal</title><style>body{font-family:sans-serif;padding:30px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:8px;} th{background:#eee;}</style></head><body onload="window.print()">${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">LAPORAN JURNAL KEGIATAN</h3><table><thead><tr><th>No</th><th>Tanggal</th><th>Mapel</th><th>Judul</th><th>Isi Jurnal</th></tr></thead><tbody>${rows}</tbody></table>${getTandaTangan('guru')}</body></html>`);
-      win.document.close();
+        const rows = jurnalToPrint.map((j, i) => `<tr><td style="text-align:center;">${i+1}</td><td>${j.tanggal}</td><td>${nMapel(j.mapelId)}</td><td>${j.judul}</td><td>${j.isi || '-'}</td></tr>`).join('');
+        const html = `<html><head><title>Cetak Jurnal</title><style>body{font-family:sans-serif;padding:30px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:8px;} th{background:#eee;}</style></head><body>${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">LAPORAN JURNAL KEGIATAN</h3><table><thead><tr><th>No</th><th>Tanggal</th><th>Mapel</th><th>Judul</th><th>Isi Jurnal</th></tr></thead><tbody>${rows}</tbody></table>${getTandaTangan('guru')}</body></html>`;
+        
+        printHTML(html);
+      } catch (e) { alert("Error cetak: " + e.message); }
     };
 
     window.cetakPDFAbsensi = () => {
-      const win = window.open('', '_blank');
-      if (!win) return alert('⚠️ Pop-up diblokir browser! Harap izinkan pop-up untuk situs ini.');
+      try {
+        const kelasId = document.getElementById('rekapAbsenKelas').value;
+        const mapelId = document.getElementById('rekapAbsenMapel').value;
+        
+        const now = new Date();
+        const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+        const tanggal = prompt('Masukkan tanggal absensi (YYYY-MM-DD):', today);
+        if (!tanggal) return;
 
-      const kelasId = document.getElementById('rekapAbsenKelas').value;
-      const mapelId = document.getElementById('rekapAbsenMapel').value;
-      
-      const now = new Date();
-      const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-      const tanggal = prompt('Masukkan tanggal absensi (YYYY-MM-DD):', today);
-      if (!tanggal) { win.close(); return; }
+        const siswaList = DB.siswa.filter(s => s.kelasId === kelasId);
+        let rows = '', tH = 0, tS = 0, tI = 0, tA = 0;
+        
+        siswaList.forEach((siswa, idx) => {
+          const absen = DB.absensi.find(a => a.siswaId === siswa.id && a.mapelId === mapelId && a.tanggal === tanggal);
+          const status = absen ? absen.status : 'Alfa';
+          const ket = absen ? (absen.keterangan || '-') : 'Belum diabsen';
+          if (status === 'Hadir') tH++; else if (status === 'Sakit') tS++; else if (status === 'Izin') tI++; else tA++;
+          rows += `<tr><td style="text-align:center;">${idx+1}</td><td>${siswa.nis}</td><td>${siswa.nama}</td><td style="text-align:center;">${status}</td><td>${ket}</td></tr>`;
+        });
 
-      const siswaList = DB.siswa.filter(s => s.kelasId === kelasId);
-      let rows = '', tH = 0, tS = 0, tI = 0, tA = 0;
-      
-      siswaList.forEach((siswa, idx) => {
-        const absen = DB.absensi.find(a => a.siswaId === siswa.id && a.mapelId === mapelId && a.tanggal === tanggal);
-        const status = absen ? absen.status : 'Alfa';
-        const ket = absen ? (absen.keterangan || '-') : 'Belum diabsen';
-        if (status === 'Hadir') tH++; else if (status === 'Sakit') tS++; else if (status === 'Izin') tI++; else tA++;
-        rows += `<tr><td style="text-align:center;">${idx+1}</td><td>${siswa.nis}</td><td>${siswa.nama}</td><td style="text-align:center;">${status}</td><td>${ket}</td></tr>`;
-      });
-
-      win.document.write(`<html><head><title>Absensi Harian</title><style>body{font-family:sans-serif;padding:30px; font-size:12px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:8px;} th{background:#eee;}</style></head><body onload="window.print()">${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">LAPORAN ABSENSI HARIAN</h3><p style="text-align:center; margin-bottom:20px;">Kelas: ${nKelas(kelasId)} - Mapel: ${nMapel(mapelId)} • Tanggal: ${tanggal.split('-').reverse().join(' ')}</p><table><thead><tr><th>No</th><th>NIS</th><th>Nama</th><th>Status</th><th>Keterangan</th></tr></thead><tbody>${rows}</tbody></table><div style="margin-top:20px;"><strong>Rekap:</strong> Hadir: ${tH} • Sakit: ${tS} • Izin: ${tI} • Alfa: ${tA} • Total: ${siswaList.length}</div>${getTandaTangan('guru', mapelId)}</body></html>`);
-      win.document.close();
+        const html = `<html><head><title>Absensi Harian</title><style>body{font-family:sans-serif;padding:30px; font-size:12px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:8px;} th{background:#eee;}</style></head><body>${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">LAPORAN ABSENSI HARIAN</h3><p style="text-align:center; margin-bottom:20px;">Kelas: ${nKelas(kelasId)} - Mapel: ${nMapel(mapelId)} • Tanggal: ${tanggal.split('-').reverse().join(' ')}</p><table><thead><tr><th>No</th><th>NIS</th><th>Nama</th><th>Status</th><th>Keterangan</th></tr></thead><tbody>${rows}</tbody></table><div style="margin-top:20px;"><strong>Rekap:</strong> Hadir: ${tH} • Sakit: ${tS} • Izin: ${tI} • Alfa: ${tA} • Total: ${siswaList.length}</div>${getTandaTangan('guru', mapelId)}</body></html>`;
+        
+        printHTML(html);
+      } catch (e) { alert("Error cetak: " + e.message); }
     };
 
     window.cetakPDFNilai = () => {
-      const win = window.open('', '_blank');
-      if (!win) return alert('⚠️ Pop-up diblokir browser! Harap izinkan pop-up untuk situs ini.');
+      try {
+        const mapelId = document.getElementById('inpMapel').value;
+        const kelasId = document.getElementById('inpKelas').value;
+        const semester = document.getElementById('inpSem').value;
+        const jmlHarian = parseInt(document.getElementById('inpHarianCount').value);
+        const siswaList = DB.siswa.filter(s => s.kelasId === kelasId);
+        let tableRows = '';
 
-      const mapelId = document.getElementById('inpMapel').value;
-      const kelasId = document.getElementById('inpKelas').value;
-      const semester = document.getElementById('inpSem').value;
-      const jmlHarian = parseInt(document.getElementById('inpHarianCount').value);
-      const siswaList = DB.siswa.filter(s => s.kelasId === kelasId);
-      let tableRows = '';
+        siswaList.forEach((siswa, idx) => {
+          const existing = DB.nilai.find(n => n.siswaId === siswa.id && n.mapelId === mapelId && n.semester === semester && n.tahunAjaran === TAHUN_AJARAN_AKTIF);
+          let harianArr = existing && existing.harian ? String(existing.harian).split(',').map(Number) : [];
+          const uts = existing ? existing.uts : 0, uas = existing ? existing.uas : 0, akhir = existing ? nilaiAkhir(existing) : 0;
+          tableRows += `<tr><td style="text-align:center;">${idx+1}</td><td>${siswa.nama}</td>${Array.from({length: jmlHarian}).map((_, i) => `<td style="text-align:center;">${harianArr[i] || '-'}</td>`).join('')}<td style="text-align:center;">${uts||'-'}</td><td style="text-align:center;">${uas||'-'}</td><td style="text-align:center;"><b>${akhir}</b></td></tr>`;
+        });
 
-      siswaList.forEach((siswa, idx) => {
-        const existing = DB.nilai.find(n => n.siswaId === siswa.id && n.mapelId === mapelId && n.semester === semester && n.tahunAjaran === TAHUN_AJARAN_AKTIF);
-        let harianArr = existing && existing.harian ? String(existing.harian).split(',').map(Number) : [];
-        const uts = existing ? existing.uts : 0, uas = existing ? existing.uas : 0, akhir = existing ? nilaiAkhir(existing) : 0;
-        tableRows += `<tr><td style="text-align:center;">${idx+1}</td><td>${siswa.nama}</td>${Array.from({length: jmlHarian}).map((_, i) => `<td style="text-align:center;">${harianArr[i] || '-'}</td>`).join('')}<td style="text-align:center;">${uts||'-'}</td><td style="text-align:center;">${uas||'-'}</td><td style="text-align:center;"><b>${akhir}</b></td></tr>`;
-      });
-
-      win.document.write(`<html><head><title>Cetak Nilai</title><style>body{font-family:sans-serif;padding:30px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:8px;} th{background:#eee;}</style></head><body onload="window.print()">${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">LAPORAN NILAI SISWA</h3><p style="text-align:center; margin-bottom:20px;">Mapel: ${nMapel(mapelId)} | Kelas: ${nKelas(kelasId)} | Semester: ${semester} | TA: ${TAHUN_AJARAN_AKTIF}</p><table><thead><tr><th>No</th><th>Nama Siswa</th>${Array.from({length: jmlHarian}).map((_, i) => `<th>H${i+1}</th>`).join('')}<th>UTS</th><th>UAS</th><th>Akhir</th></tr></thead><tbody>${tableRows}</tbody></table>${getTandaTangan('guru', mapelId)}</body></html>`);
-      win.document.close();
+        const html = `<html><head><title>Cetak Nilai</title><style>body{font-family:sans-serif;padding:30px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:8px;} th{background:#eee;}</style></head><body>${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">LAPORAN NILAI SISWA</h3><p style="text-align:center; margin-bottom:20px;">Mapel: ${nMapel(mapelId)} | Kelas: ${nKelas(kelasId)} | Semester: ${semester} | TA: ${TAHUN_AJARAN_AKTIF}</p><table><thead><tr><th>No</th><th>Nama Siswa</th>${Array.from({length: jmlHarian}).map((_, i) => `<th>H${i+1}</th>`).join('')}<th>UTS</th><th>UAS</th><th>Akhir</th></tr></thead><tbody>${tableRows}</tbody></table>${getTandaTangan('guru', mapelId)}</body></html>`;
+        
+        printHTML(html);
+      } catch (e) { alert("Error cetak: " + e.message); }
     };
 
     window.cetakRekapNilaiSemesteran = () => {
-      const win = window.open('', '_blank');
-      if (!win) return alert('⚠️ Pop-up diblokir browser! Harap izinkan pop-up untuk situs ini.');
+      try {
+        const waliInfo = getMyWaliKelasInfo();
+        if (!waliInfo) return alert('Anda bukan Wali Kelas.');
 
-      const waliInfo = getMyWaliKelasInfo();
-      if (!waliInfo) { win.close(); return alert('Anda bukan Wali Kelas.'); }
+        const semester = prompt('Masukkan Semester (Ganjil/Genap):', 'Ganjil');
+        if (!semester) return;
 
-      const semester = prompt('Masukkan Semester (Ganjil/Genap):', 'Ganjil');
-      if (!semester) { win.close(); return; }
-
-      const siswaList = DB.siswa.filter(s => s.kelasId === waliInfo.kelasId);
-      const mapelList = DB.mapel;
-      
-      let studentScores = siswaList.map(siswa => {
-        let total = 0;
-        let mapelScores = mapelList.map(m => {
-          const n = DB.nilai.find(x => x.siswaId === siswa.id && x.mapelId === m.id && x.semester === semester && x.tahunAjaran === TAHUN_AJARAN_AKTIF);
-          const val = n ? nilaiAkhir(n) : 0; 
-          total += val;
-          return { val, hasScore: !!n };
+        const siswaList = DB.siswa.filter(s => s.kelasId === waliInfo.kelasId);
+        const mapelList = DB.mapel;
+        
+        let studentScores = siswaList.map(siswa => {
+          let total = 0;
+          let mapelScores = mapelList.map(m => {
+            const n = DB.nilai.find(x => x.siswaId === siswa.id && x.mapelId === m.id && x.semester === semester && x.tahunAjaran === TAHUN_AJARAN_AKTIF);
+            const val = n ? nilaiAkhir(n) : 0; 
+            total += val;
+            return { val, hasScore: !!n };
+          });
+          let avg = mapelList.length > 0 ? (total / mapelList.length) : 0;
+          return { siswa, total, avg, mapelScores };
         });
-        let avg = mapelList.length > 0 ? (total / mapelList.length) : 0;
-        return { siswa, total, avg, mapelScores };
-      });
 
-      studentScores.sort((a, b) => b.avg - a.avg);
+        studentScores.sort((a, b) => b.avg - a.avg);
 
-      let tableRows = '';
-      studentScores.forEach((item, idx) => {
-        let nilaiHtml = item.mapelScores.map(ms => `<td style="text-align:center;">${ms.hasScore ? ms.val : '-'}</td>`).join('');
-        tableRows += `<tr>
-          <td style="text-align:center;">${idx + 1}</td>
-          <td>${item.siswa.nama}</td>
-          ${nilaiHtml}
-          <td style="text-align:center;"><b>${item.total.toFixed(2)}</b></td>
-          <td style="text-align:center;"><b>${item.avg.toFixed(2)}</b></td>
-          <td style="text-align:center;"><b>${idx + 1}</b></td>
-        </tr>`;
-      });
+        let tableRows = '';
+        studentScores.forEach((item, idx) => {
+          let nilaiHtml = item.mapelScores.map(ms => `<td style="text-align:center;">${ms.hasScore ? ms.val : '-'}</td>`).join('');
+          tableRows += `<tr>
+            <td style="text-align:center;">${idx + 1}</td>
+            <td>${item.siswa.nama}</td>
+            ${nilaiHtml}
+            <td style="text-align:center;"><b>${item.total.toFixed(2)}</b></td>
+            <td style="text-align:center;"><b>${item.avg.toFixed(2)}</b></td>
+            <td style="text-align:center;"><b>${idx + 1}</b></td>
+          </tr>`;
+        });
 
-      win.document.write(`
-        <html><head><title>Rekap Nilai Semesteran</title>
-        <style>
-          body{font-family:sans-serif;padding:20px; font-size:11px;} 
-          table{width:100%;border-collapse:collapse;margin-top:20px;} 
-          th,td{border:1px solid #000;padding:6px;} 
-          th{background:#eee;}
-        </style></head>
-        <body onload="window.print()">
-          ${getKopSurat()}
-          <h3 style="text-align:center; text-decoration:underline;">REKAP NILAI SEMESTERAN</h3>
-          <p style="text-align:center; margin-bottom:20px;">Kelas: ${waliInfo.kelasNama} | Semester: ${semester} | Tahun Ajaran: ${TAHUN_AJARAN_AKTIF}</p>
-          <table>
-            <thead>
-              <tr>
-                <th rowspan="2" style="text-align:center; vertical-align:middle;">No</th>
-                <th rowspan="2" style="vertical-align:middle;">Nama Siswa</th>
-                <th colspan="${mapelList.length}" style="text-align:center;">Nilai Mata Pelajaran</th>
-                <th rowspan="2" style="text-align:center; vertical-align:middle;">Jumlah</th>
-                <th rowspan="2" style="text-align:center; vertical-align:middle;">Rata-rata</th>
-                <th rowspan="2" style="text-align:center; vertical-align:middle;">Rangking</th>
-              </tr>
-              <tr>
-                ${mapelList.map(m => `<th style="text-align:center;">${m.kode}</th>`).join('')}
-              </tr>
-            </thead>
-            <tbody>${tableRows}</tbody>
-          </table>
-          ${getTandaTangan('wali')}
-        </body></html>
-      `);
-      win.document.close();
+        const html = `
+          <html><head><title>Rekap Nilai Semesteran</title>
+          <style>
+            body{font-family:sans-serif;padding:20px; font-size:11px;} 
+            table{width:100%;border-collapse:collapse;margin-top:20px;} 
+            th,td{border:1px solid #000;padding:6px;} 
+            th{background:#eee;}
+          </style></head>
+          <body>
+            ${getKopSurat()}
+            <h3 style="text-align:center; text-decoration:underline;">REKAP NILAI SEMESTERAN</h3>
+            <p style="text-align:center; margin-bottom:20px;">Kelas: ${waliInfo.kelasNama} | Semester: ${semester} | Tahun Ajaran: ${TAHUN_AJARAN_AKTIF}</p>
+            <table>
+              <thead>
+                <tr>
+                  <th rowspan="2" style="text-align:center; vertical-align:middle;">No</th>
+                  <th rowspan="2" style="vertical-align:middle;">Nama Siswa</th>
+                  <th colspan="${mapelList.length}" style="text-align:center;">Nilai Mata Pelajaran</th>
+                  <th rowspan="2" style="text-align:center; vertical-align:middle;">Jumlah</th>
+                  <th rowspan="2" style="text-align:center; vertical-align:middle;">Rata-rata</th>
+                  <th rowspan="2" style="text-align:center; vertical-align:middle;">Rangking</th>
+                </tr>
+                <tr>
+                  ${mapelList.map(m => `<th style="text-align:center;">${m.kode}</th>`).join('')}
+                </tr>
+              </thead>
+              <tbody>${tableRows}</tbody>
+            </table>
+            ${getTandaTangan('wali')}
+          </body></html>
+        `;
+        
+        printHTML(html);
+      } catch (e) { alert("Error cetak: " + e.message); }
     };
 
     window.cetakRaporWaliKelas = () => {
-      const win = window.open('', '_blank');
-      if (!win) return alert('⚠️ Pop-up diblokir browser! Harap izinkan pop-up untuk situs ini.');
-
-      const waliInfo = getMyWaliKelasInfo();
-      let targetKelasId = waliInfo ? waliInfo.kelasId : prompt(`Pilih Kelas (ketik nama kelas persis, misal VII A):`, '');
-      
-      if (!targetKelasId) { win.close(); return; }
-      if (!waliInfo) {
-        const kelas = DB.kelas.find(k => k.nama.toLowerCase() === targetKelasId.toLowerCase());
-        if(!kelas) { win.close(); return alert('Kelas tidak ditemukan'); }
-        targetKelasId = kelas.id;
-      }
-      
-      const semester = prompt('Masukkan Semester (Ganjil/Genap):', 'Ganjil');
-      if (!semester) { win.close(); return; }
-
-      const siswaList = DB.siswa.filter(s => s.kelasId === targetKelasId).sort((a,b) => a.nama.localeCompare(b.nama));
-      const mapelList = DB.mapel;
-      let tableRows = '';
-
-      siswaList.forEach((siswa, idx) => {
-        let nilaiHtml = mapelList.map(m => {
-           const n = DB.nilai.find(x => x.siswaId === siswa.id && x.mapelId === m.id && x.semester === semester && x.tahunAjaran === TAHUN_AJARAN_AKTIF);
-           return `<td style="text-align:center;">${n ? nilaiAkhir(n) : '-'}</td>`;
-        }).join('');
+      try {
+        const waliInfo = getMyWaliKelasInfo();
+        let targetKelasId = waliInfo ? waliInfo.kelasId : prompt(`Pilih Kelas (ketik nama kelas persis, misal VII A):`, '');
         
-        const yearStart = TAHUN_AJARAN_AKTIF.split('/')[0];
-        const absensi = DB.absensi.filter(a => a.siswaId === siswa.id && String(a.tanggal).startsWith(yearStart));
-        const h = absensi.filter(a => a.status === 'Hadir').length, s = absensi.filter(a => a.status === 'Sakit').length, i = absensi.filter(a => a.status === 'Izin').length, a = absensi.filter(a => a.status === 'Alfa').length;
+        if (!targetKelasId) return;
+        if (!waliInfo) {
+          const kelas = DB.kelas.find(k => k.nama.toLowerCase() === targetKelasId.trim().toLowerCase());
+          if(!kelas) return alert('Kelas tidak ditemukan');
+          targetKelasId = kelas.id;
+        }
         
-        tableRows += `<tr><td style="text-align:center;">${idx+1}</td><td>${siswa.nama}</td>${nilaiHtml}<td style="text-align:center;">${h}</td><td style="text-align:center;">${s}</td><td style="text-align:center;">${i}</td><td style="text-align:center;">${a}</td></tr>`;
-      });
+        const semester = prompt('Masukkan Semester (Ganjil/Genap):', 'Ganjil');
+        if (!semester) return;
 
-      win.document.write(`<html><head><title>Rekap Rapor</title><style>body{font-family:sans-serif;padding:30px; font-size:12px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:6px;} th{background:#eee;}</style></head><body onload="window.print()">${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">REKAP RAPOR SISWA</h3><p style="text-align:center; margin-bottom:20px;">Kelas: ${nKelas(targetKelasId)} | Semester: ${semester} | TA: ${TAHUN_AJARAN_AKTIF}</p><table><thead><tr><th rowspan="2">No</th><th rowspan="2">Nama Siswa</th><th colspan="${mapelList.length}">Nilai Mapel</th><th colspan="4">Absensi</th></tr><tr>${mapelList.map(m => `<th>${m.kode}</th>`).join('')}<th>H</th><th>S</th><th>I</th><th>A</th></tr></thead><tbody>${tableRows}</tbody></table>${getTandaTangan('wali')}</body></html>`);
-      win.document.close();
+        const siswaList = DB.siswa.filter(s => s.kelasId === targetKelasId).sort((a,b) => a.nama.localeCompare(b.nama));
+        const mapelList = DB.mapel;
+        let tableRows = '';
+
+        siswaList.forEach((siswa, idx) => {
+          let nilaiHtml = mapelList.map(m => {
+             const n = DB.nilai.find(x => x.siswaId === siswa.id && x.mapelId === m.id && x.semester === semester && x.tahunAjaran === TAHUN_AJARAN_AKTIF);
+             return `<td style="text-align:center;">${n ? nilaiAkhir(n) : '-'}</td>`;
+          }).join('');
+          
+          const yearStart = TAHUN_AJARAN_AKTIF.split('/')[0];
+          const absensi = DB.absensi.filter(a => a.siswaId === siswa.id && String(a.tanggal).startsWith(yearStart));
+          const h = absensi.filter(a => a.status === 'Hadir').length, s = absensi.filter(a => a.status === 'Sakit').length, i = absensi.filter(a => a.status === 'Izin').length, a = absensi.filter(a => a.status === 'Alfa').length;
+          
+          tableRows += `<tr><td style="text-align:center;">${idx+1}</td><td>${siswa.nama}</td>${nilaiHtml}<td style="text-align:center;">${h}</td><td style="text-align:center;">${s}</td><td style="text-align:center;">${i}</td><td style="text-align:center;">${a}</td></tr>`;
+        });
+
+        const html = `<html><head><title>Rekap Rapor</title><style>body{font-family:sans-serif;padding:30px; font-size:12px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:6px;} th{background:#eee;}</style></head><body>${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">REKAP RAPOR SISWA</h3><p style="text-align:center; margin-bottom:20px;">Kelas: ${nKelas(targetKelasId)} | Semester: ${semester} | TA: ${TAHUN_AJARAN_AKTIF}</p><table><thead><tr><th rowspan="2">No</th><th rowspan="2">Nama Siswa</th><th colspan="${mapelList.length}">Nilai Mapel</th><th colspan="4">Absensi</th></tr><tr>${mapelList.map(m => `<th>${m.kode}</th>`).join('')}<th>H</th><th>S</th><th>I</th><th>A</th></tr></thead><tbody>${tableRows}</tbody></table>${getTandaTangan('wali')}</body></html>`;
+        
+        printHTML(html);
+      } catch (e) { alert("Error cetak: " + e.message); }
     };
 
     // ==========================================
@@ -1193,7 +1215,6 @@
       if (!confirm('Apakah Anda yakin ingin menghapus data ini secara permanen?')) return;
       showLoading('Menghapus...');
       try {
-        // Pastikan id dan entity terkirim dengan benar
         const res = await apiCall('delete', entity, { id: id });
         if (res.ok || res.success) {
           DB[entity] = DB[entity].filter(x => x.id !== id); 
