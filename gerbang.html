@@ -355,11 +355,16 @@
     }
     
     function formatTgl(tglStr) {
-        if (!tglStr) return '-';
-        const p = tglStr.split('-');
-        if (p.length !== 3) return tglStr;
-        return p[2] + '/' + p[1] + '/' + p[0];
-    }
+    if (!tglStr) return '-';
+    const d = new Date(tglStr);
+    // Jika format tidak dikenali, kembalikan teks aslinya
+    if (isNaN(d.getTime())) return String(tglStr).slice(0,10); 
+    
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+}
     
     function escapeStr(s) {
         return (s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
