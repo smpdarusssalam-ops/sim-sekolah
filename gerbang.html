@@ -1089,32 +1089,46 @@ function printHTMLLaporan(html) {
     }
 
     function printSelectedQR() {
-        const nisArr = Object.keys(qrSelectedSet);
-        if (nisArr.length === 0) return alert('Pilih minimal 1 siswa terlebih dahulu.');
-        
-        const win = window.open('', '_blank');
-        let html = '<!DOCTYPE html><html><head><title>Cetak Kartu QR</title><style>' +
-            'body{font-family:Arial;padding:10px;}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}' +
-            '.card{padding:8px;border:2px dashed #8e44ad;border-radius:8px;text-align:center;page-break-inside:avoid;}' +
-            '.card img{width:100%;max-width:160px;height:auto;}.nama{font-size:11px;font-weight:bold;margin:4px 0 2px;line-height:1.2;}' +
-            '.nis{font-family:monospace;font-size:10px;color:#666;}.kelas{font-size:9px;color:#8e44ad;font-weight:bold;}' +
-            '.header-title{text-align:center;margin-bottom:15px;font-size:14px;font-weight:bold;}' +
-            '@media print{@page{margin:8mm;size:A4;}}</style></head><body>' +
-            '<div class="header-title">KARTU ABSENSI SISWA - QR CODE</div><div class="grid">';
-        
-        nisArr.forEach(nis => {
-            const siswa = qrStudentsList.find(s => s.nis === nis);
-            if (!siswa) return;
-            const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(nis) + '&margin=10';
-            html += '<div class="card"><img src="' + qrUrl + '" crossorigin="anonymous">' +
-                '<div class="nama">' + siswa.nama + '</div><div class="nis">' + siswa.nis + '</div><div class="kelas">' + siswa.kelas + '</div></div>';
-        });
-        
-        html += '</div></body></html>';
-        win.document.write(html);
-        win.document.close();
-        setTimeout(() => win.print(), 1500);
-    }
+    const nisArr = Object.keys(qrSelectedSet);
+    if (nisArr.length === 0) return alert('Pilih minimal 1 siswa terlebih dahulu.');
+    
+    const win = window.open('', '_blank');
+    if (!win) return alert('⚠️ Pop-up diblokir browser! Harap izinkan pop-up untuk situs ini.');
+
+    let html = '<!DOCTYPE html><html><head><title>Cetak Kartu QR</title><style>' +
+        'body{font-family:Arial;padding:10px;margin:0;}' +
+        '.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}' +
+        '.card{padding:8px;border:2px dashed #8e44ad;border-radius:8px;text-align:center;page-break-inside:avoid;}' +
+        '.card img{width:100%;max-width:160px;height:auto;}' +
+        '.nama{font-size:11px;font-weight:bold;margin:4px 0 2px;line-height:1.2;}' +
+        '.nis{font-family:monospace;font-size:10px;color:#666;}' +
+        '.kelas{font-size:9px;color:#8e44ad;font-weight:bold;}' +
+        '.header-title{text-align:center;margin-bottom:15px;font-size:14px;font-weight:bold;}' +
+        '@media print{@page{margin:8mm;size:A4;}}' +
+        '</style></head><body>' +
+        '<div class="header-title">KARTU ABSENSI SISWA - QR CODE</div><div class="grid">';
+    
+    nisArr.forEach(nis => {
+        const siswa = qrStudentsList.find(s => s.nis === nis);
+        if (!siswa) return;
+        // Hapus crossorigin="anonymous" agar tidak diblokir
+        const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(nis) + '&margin=10';
+        html += '<div class="card"><img src="' + qrUrl + '">' +
+            '<div class="nama">' + siswa.nama + '</div><div class="nis">' + siswa.nis + '</div><div class="kelas">' + siswa.kelas + '</div></div>';
+    });
+    
+    // TAMBAHAN: Script di dalam iframe/window untuk menunggu semua gambar selesai dimuat
+    html += '</div>' +
+        '<script>' +
+        'window.addEventListener("load", function() {' +
+        '  setTimeout(function(){ window.print(); }, 500);' + // Tunggu setengah detik setelah gambar terakhir dimuat
+        '});' +
+        '<\/script>' +
+        '</body></html>';
+
+    win.document.write(html);
+    win.document.close();
+}
 </script>
 </body>
 </html>
