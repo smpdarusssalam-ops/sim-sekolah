@@ -324,10 +324,7 @@
 
   return `
     <div style="display:flex; align-items:center; margin-bottom:5px;">
-      <!-- Bagian Logo Kiri -->
       <div style="width:100px; text-align:center;">${logoHtml}</div>
-      
-      <!-- Bagian Teks Tengah -->
       <div style="flex:1; text-align:center; padding:0 10px; line-height:1.3;">
         <div style="font-size:15px; font-weight:bold; font-family:'Times New Roman', Times, serif;">${getVal('namaYayasan', 'YAYASAN PENDIDIKAN')}</div>
         <div style="font-size:22px; font-weight:bold; letter-spacing:1px; font-family:'Times New Roman', Times, serif;">${getVal('namaSekolah', 'NAMA SEKOLAH')}</div>
@@ -335,46 +332,60 @@
         <div style="font-size:11px;">${getVal('alamat', 'Jl. Raya Sekolah No. 1')}</div>
         <div style="font-size:11px;">${getVal('kontak', 'Telp: 0262-xxxx | Email: info@sekolah.sch.id')}</div>
       </div>
-      
-      <!-- Bagian Kanan (Kosong sebagai penyeimbang agar teks tetap di tengah) -->
       <div style="width:100px;"></div>
     </div>
-    
-    <!-- Garis Ganda Kop Surat -->
     <div style="border-bottom: 3px solid #000; margin-bottom: 2px;"></div>
     <div style="border-bottom: 1px solid #000; margin-bottom: 20px;"></div>
   `;
 }
 
-    function getTandaTangan(role = 'guru', mapelId = null) {
-      let ttdKiri = '', ttdKanan = '';
-      const tgl = new Date().toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'});
-      const kepsek = getVal('kepsek', '..............................');
-      const nrks = getVal('nrksKepsek', getVal('nipKepsek', '-'));
+function getTandaTangan(role = 'guru', mapelId = null) {
+  let ttdKiri = '', ttdKanan = '';
+  const tgl = new Date().toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'});
+  const kepsek = getVal('kepsek', '..............................');
+  const nrks = getVal('nrksKepsek', getVal('nipKepsek', '-'));
 
-      let guruName = CURRENT_USER.nama;
-      let jabatanKanan = 'Guru Mata Pelajaran';
-      let idKanan = 'NUPTK: -';
-      let nuptk = '-';
+  let guruName = CURRENT_USER.nama;
+  let jabatanKanan = 'Guru Mata Pelajaran';
+  let nuptk = '-';
 
-      const myGuru = DB.guru.find(g => g.nama && g.nama.trim().toLowerCase() === CURRENT_USER.nama.trim().toLowerCase());
-      if (myGuru) { guruName = myGuru.nama; nuptk = myGuru.nip || '-'; }
+  // Ambil data Guru dari database
+  const myGuru = DB.guru.find(g => g.nama && g.nama.trim().toLowerCase() === CURRENT_USER.nama.trim().toLowerCase());
+  if (myGuru) { guruName = myGuru.nama; nuptk = myGuru.nip || '-'; }
 
-      if (role === 'guru' && mapelId) {
-        const mapelGuru = DB.guru.find(g => g.mapelId === mapelId);
-        if (mapelGuru) { guruName = mapelGuru.nama; nuptk = mapelGuru.nip || '-'; }
-      }
+  if (role === 'guru' && mapelId) {
+    const mapelGuru = DB.guru.find(g => g.mapelId === mapelId);
+    if (mapelGuru) { guruName = mapelGuru.nama; nuptk = mapelGuru.nip || '-'; }
+  }
 
-      if (role === 'wali') { jabatanKanan = 'Wali Kelas'; idKanan = `NUPTK: ${nuptk}`; } 
-      else if (role === 'kepsek' || CURRENT_USER.role.toLowerCase().includes('kepsek')) { jabatanKanan = 'Kepala Sekolah'; guruName = kepsek; idKanan = `NRKS: ${nrks}`; } 
-      else { idKanan = `NUPTK: ${nuptk}`; }
+  if (role === 'wali') { jabatanKanan = 'Wali Kelas'; } 
+  else if (role === 'kepsek' || CURRENT_USER.role.toLowerCase().includes('kepsek')) { 
+    jabatanKanan = 'Kepala Sekolah'; 
+    guruName = kepsek; 
+    nuptk = nrks; // Gunakan NRKS untuk kepsek
+  }
 
-      ttdKiri = `<div style="text-align:center;"><p>Mengetahui,</p><p>Kepala Sekolah</p><br><br><br><p style="font-weight:bold; text-decoration:underline;">${kepsek}</p><p>NRKS: ${nrks}</p></div>`;
-      ttdKanan = `<div style="text-align:center;"><p>Garut, ${tgl}</p><p>${jabatanKanan}</p><br><br><br><p style="font-weight:bold; text-decoration:underline;">${guruName}</p><p>${idKanan}</p></div>`;
+  // DESAIN TTD BARU (Lebih Rapi)
+  ttdKiri = `
+    <div style="text-align:center; width:45%;">
+      <p>Mengetahui,</p>
+      <p>Kepala Sekolah</p>
+      <div style="height: 60px;"></div>
+      <p style="font-weight:bold; text-decoration:underline; margin-bottom: 2px;">${kepsek}</p>
+      <p style="margin-top: 0;">NRKS: ${nrks}</p>
+    </div>`;
+    
+  ttdKanan = `
+    <div style="text-align:center; width:45%;">
+      <p>Garut, ${tgl}</p>
+      <p>${jabatanKanan}</p>
+      <div style="height: 60px;"></div>
+      <p style="font-weight:bold; text-decoration:underline; margin-bottom: 2px;">${guruName}</p>
+      <p style="margin-top: 0;">NUPTK: ${nuptk}</p>
+    </div>`;
 
-      return `<div style="display:flex; justify-content:space-between; margin-top:40px;"><div style="width:45%;">${ttdKiri}</div><div style="width:45%;">${ttdKanan}</div></div>`;
-    }
-
+  return `<div style="display:flex; justify-content:space-between; margin-top:30px;">${ttdKiri}${ttdKanan}</div>`;
+}
     // ==========================================
     // RENDER FUNCTIONS
     // ==========================================
