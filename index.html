@@ -820,92 +820,108 @@
       } catch (e) { toast(e.message, 'error'); } finally { hideLoading(); }
     };
 
-    window.muatTabelAbsensi = async () => {
-      const mapelId = document.getElementById('inpAbsenMapel').value;
-      const kelasId = document.getElementById('inpAbsenKelas').value;
-      const tanggal = document.getElementById('inpAbsenTgl').value;
-      
-      if (!mapelId || !kelasId || !tanggal) return toast('Lengkapi data terlebih dahulu.', 'error');
+   window.muatTabelAbsensi = async () => {
+  const mapelId = document.getElementById('inpAbsenMapel').value;
+  const kelasId = document.getElementById('inpAbsenKelas').value;
+  const tanggal = document.getElementById('inpAbsenTgl').value;
+  
+  if (!mapelId || !kelasId || !tanggal) return toast('Lengkapi data terlebih dahulu.', 'error');
 
-      const siswaList = DB.siswa.filter(s => s.kelasId === kelasId && (!s.status || s.status === 'Aktif'));
-      if (siswaList.length === 0) return document.getElementById('tabelAbsensiContainer').innerHTML = '<div class="card"><p class="empty" style="text-align:center;">Tidak ada siswa aktif di kelas ini.</p></div>';
+  const siswaList = DB.siswa.filter(s => s.kelasId === kelasId && (!s.status || s.status === 'Aktif'));
+  if (siswaList.length === 0) return document.getElementById('tabelAbsensiContainer').innerHTML = '<div class="card"><p class="empty" style="text-align:center;">Tidak ada siswa aktif di kelas ini.</p></div>';
 
-      showLoading('Menarik data gerbang...');
+  showLoading('Menarik data gerbang...');
 
-      let dataGerbang = [];
-      try {
-        const resGerbang = await apiCall('laporan', 'absensiGerbang', { data: { jenis: 'harian', tanggal: tanggal } });
-        if (resGerbang.success && resGerbang.data) dataGerbang = resGerbang.data;
-      } catch (e) {
-        console.log("Info: Data gerbang tidak ditarik.");
-      }
+  let dataGerbang = [];
+  try {
+    // Tampilkan log di Console (F12) untuk memantau
+    console.log("Meminta data gerbang tanggal:", tanggal);
+    
+    const resGerbang = await apiCall('laporan', 'absensiGerbang', { data: { jenis: 'harian', tanggal: tanggal } });
+    
+    if (resGerbang.success && resGerbang.data) {
+      dataGerbang = resGerbang.data;
+      console.log("Data gerbang berhasil diterima:", dataGerbang);
+    } else {
+      console.warn("Data gerbang kosong atau gagal dimuat dari server.");
+    }
+  } catch (e) {
+    console.error("Gagal Fetch Gerbang:", e);
+    alert("⚠️ Gagal menarik data dari server gerbang! Pastikan Code.gs sudah di-Deploy (New Version) dan URL Web App benar.");
+  }
 
-      hideLoading();
+  hideLoading();
 
-      let tableHtml = `
-        <div class="card">
-          <h3>Validasi Absensi ${nKelas(kelasId)} - ${nMapel(mapelId)} (${tanggal})</h3>
-          <div class="hint" style="margin-bottom:10px;">💡 Status <b>Hadir</b> otomatis terisi jika siswa sudah scan di gerbang. Guru cukup menyesuaikan jika ada siswa bolos.</div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Nama Siswa</th>
-                  <th>Kelas</th>
-                  <th>Info Gerbang</th>
-                  <th>Status Kelas</th>
-                  <th>Keterangan</th>
-                </tr>
-              </thead>
-              <tbody>`;
+  let tableHtml = `
+    <div class="card">
+      <h3>Validasi Absensi ${nKelas(kelasId)} - ${nMapel(mapelId)} (${tanggal})</h3>
+      <div class="hint" style="margin-bottom:10px;">💡 Status <b>Hadir</b> otomatis terisi jika siswa sudah scan di gerbang. Guru cukup menyesuaikan jika ada siswa bolos.</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Nama Siswa</th>
+              <th>Kelas</th>
+              <th>Info Gerbang</th>
+              <th>Status Kelas</th>
+              <th>Keterangan</th>
+            </tr>
+          </thead>
+          <tbody>`;
 
-      siswaList.forEach(siswa => {
-        const existing = DB.absensi.find(a => a.siswaId === siswa.id && a.mapelId === mapelId && a.tanggal === tanggal);
-        
-        const scan = dataGerbang.find(g => String(g.nis) === String(siswa.nis));
-        let badgeGerbang = `<span class="badge b-red">Tidak Scan</span>`;
-        if (scan && scan.jamMasuk && scan.jamMasuk !== '-') {
-          badgeGerbang = `<span class="badge b-green">Hadir ${scan.jamMasuk}</span>`;
-        }
+  siswaList.forEach(siswa => {
+    const existing = DB.absensi.find(a => a.siswaId === siswa.id && a.mapelId === mapelId && a.tanggal === tanggal);
+    
+    // PINTAR: Cocokkan NIS dengan membuang spasi dan mengabaikan angka 0 di depan
+    const nisSiswa = String(siswa.nis).trim();
+    const scan = dataGerbang.find(g => {
+      const nisGerbang = String(g.nis).trim();
+      // Cocokkan persis ATAU abaikan 0 di depan
+      return nisGerbang === nisSiswa || nisGerbang.replace(/^0+/, '') === nisSiswa.replace(/^0+/, '');
+    });
 
-        let defaultStatus = 'Alfa'; 
-        if (existing) {
-          defaultStatus = existing.status;
-        } else if (scan && scan.jamMasuk) {
-          defaultStatus = 'Hadir'; 
-        }
+    let badgeGerbang = `<span class="badge b-red">Tidak Scan</span>`;
+    if (scan && scan.jamMasuk && scan.jamMasuk !== '-') {
+      badgeGerbang = `<span class="badge b-green">Hadir ${scan.jamMasuk}</span>`;
+    }
 
-        const ket = existing ? existing.keterangan : '';
+    let defaultStatus = 'Alfa'; 
+    if (existing) {
+      defaultStatus = existing.status;
+    } else if (scan && scan.jamMasuk) {
+      defaultStatus = 'Hadir'; 
+    }
 
-        tableHtml += `
-          <tr data-siswa="${siswa.id}" data-absen-id="${existing ? existing.id : ''}">
-            <td><b>${esc(siswa.nama)}</b><br><span style="font-size:.72rem;color:var(--muted);">${esc(siswa.nis)}</span></td>
-            <td><span class="badge b-blue">${esc(nKelas(siswa.kelasId))}</span></td>
-            <td>${badgeGerbang}</td>
-            <td>
-              <select class="inp-absen-status" style="width:100px;">
-                <option value="Hadir" ${defaultStatus==='Hadir'?'selected':''}>Hadir</option>
-                <option value="Sakit" ${defaultStatus==='Sakit'?'selected':''}>Sakit</option>
-                <option value="Izin" ${defaultStatus==='Izin'?'selected':''}>Izin</option>
-                <option value="Alfa" ${defaultStatus==='Alfa'?'selected':''}>Alfa</option>
-              </select>
-            </td>
-            <td><input type="text" class="inp-absen-ket" value="${esc(ket)}" placeholder="Opsional"></td>
-          </tr>`;
-      });
+    const ket = existing ? existing.keterangan : '';
 
-      tableHtml += `
-              </tbody>
-            </table>
-          </div>
-          <div class="btn-row">
-            <button class="btn btn-success" onclick="simpanSemuaAbsensi('${mapelId}', '${tanggal}')">💾 Validasi & Simpan Absensi</button>
-          </div>
-        </div>`;
+    tableHtml += `
+      <tr data-siswa="${siswa.id}" data-absen-id="${existing ? existing.id : ''}">
+        <td><b>${esc(siswa.nama)}</b><br><span style="font-size:.72rem;color:var(--muted);">${esc(siswa.nis)}</span></td>
+        <td><span class="badge b-blue">${esc(nKelas(siswa.kelasId))}</span></td>
+        <td>${badgeGerbang}</td>
+        <td>
+          <select class="inp-absen-status" style="width:100px;">
+            <option value="Hadir" ${defaultStatus==='Hadir'?'selected':''}>Hadir</option>
+            <option value="Sakit" ${defaultStatus==='Sakit'?'selected':''}>Sakit</option>
+            <option value="Izin" ${defaultStatus==='Izin'?'selected':''}>Izin</option>
+            <option value="Alfa" ${defaultStatus==='Alfa'?'selected':''}>Alfa</option>
+          </select>
+        </td>
+        <td><input type="text" class="inp-absen-ket" value="${esc(ket)}" placeholder="Opsional"></td>
+      </tr>`;
+  });
 
-      document.getElementById('tabelAbsensiContainer').innerHTML = tableHtml;
-    };
+  tableHtml += `
+          </tbody>
+        </table>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-success" onclick="simpanSemuaAbsensi('${mapelId}', '${tanggal}')">💾 Validasi & Simpan Absensi</button>
+      </div>
+    </div>`;
 
+  document.getElementById('tabelAbsensiContainer').innerHTML = tableHtml;
+};
     window.simpanSemuaAbsensi = async (mapelId, tanggal) => {
       const rows = document.querySelectorAll('#tabelAbsensiContainer tbody tr');
       showLoading('Menyimpan...'); 
