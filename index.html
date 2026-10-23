@@ -315,22 +315,36 @@
 
     function getVal(key, def) { return DB.pengaturan.find(p => p.key === key)?.value || def; }
 
-    function getKopSurat() {
-      const logoUrl = getVal('logo', '');
-      let logoHtml = logoUrl ? `<img src="${logoUrl}" style="max-width:80px; max-height:80px;">` : `<div style="width:80px; height:80px; background:#eee; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px;">🏫</div>`;
-      return `
-        <div style="display:flex; align-items:center; border-bottom:3px solid #000; padding-bottom:10px; margin-bottom:20px;">
-          <div style="width:100px; text-align:center;">${logoHtml}</div>
-          <div style="flex:1; text-align:center; padding:0 10px;">
-            <div style="font-size:14px; font-weight:bold;">${getVal('namaYayasan', 'YAYASAN PENDIDIKAN')}</div>
-            <div style="font-size:20px; font-weight:bold; margin:2px 0;">${getVal('namaSekolah', 'NAMA SEKOLAH')}</div>
-            <div style="font-size:11px;">${getVal('akreditasi', '')}</div>
-            <div style="font-size:11px;">${getVal('alamat', '')}</div>
-            <div style="font-size:11px;">${getVal('kontak', '')}</div>
-          </div>
-        </div>
-      `;
-    }
+   function getKopSurat() {
+  const logoUrl = getVal('logo', '');
+  // Tampilan jika logo belum diisi atau gagal dimuat
+  let logoHtml = logoUrl 
+    ? `<img src="${logoUrl}" style="max-width:85px; max-height:85px; object-fit:contain;">` 
+    : `<div style="width:85px; height:85px; background:#eee; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:32px;">🏫</div>`;
+
+  return `
+    <div style="display:flex; align-items:center; margin-bottom:5px;">
+      <!-- Bagian Logo Kiri -->
+      <div style="width:100px; text-align:center;">${logoHtml}</div>
+      
+      <!-- Bagian Teks Tengah -->
+      <div style="flex:1; text-align:center; padding:0 10px; line-height:1.3;">
+        <div style="font-size:15px; font-weight:bold; font-family:'Times New Roman', Times, serif;">${getVal('namaYayasan', 'YAYASAN PENDIDIKAN')}</div>
+        <div style="font-size:22px; font-weight:bold; letter-spacing:1px; font-family:'Times New Roman', Times, serif;">${getVal('namaSekolah', 'NAMA SEKOLAH')}</div>
+        <div style="font-size:12px; font-weight:bold;">TERAKREDITASI ${getVal('akreditasi', 'A')}</div>
+        <div style="font-size:11px;">${getVal('alamat', 'Jl. Raya Sekolah No. 1')}</div>
+        <div style="font-size:11px;">${getVal('kontak', 'Telp: 0262-xxxx | Email: info@sekolah.sch.id')}</div>
+      </div>
+      
+      <!-- Bagian Kanan (Kosong sebagai penyeimbang agar teks tetap di tengah) -->
+      <div style="width:100px;"></div>
+    </div>
+    
+    <!-- Garis Ganda Kop Surat -->
+    <div style="border-bottom: 3px solid #000; margin-bottom: 2px;"></div>
+    <div style="border-bottom: 1px solid #000; margin-bottom: 20px;"></div>
+  `;
+}
 
     function getTandaTangan(role = 'guru', mapelId = null) {
       let ttdKiri = '', ttdKanan = '';
@@ -1013,8 +1027,60 @@
     };
 
     function renderAgenda() {
-      return `<div class="card"><h3>🗓️ Agenda Sekolah</h3><p>Fitur Agenda siap dikembangkan.</p></div>`;
-    }
+  const isAdmin = CURRENT_USER.role.toLowerCase().includes('admin');
+  let formHtml = '';
+
+  // Form input HANYA muncul untuk Admin
+  if (isAdmin) {
+    formHtml = `
+      <div class="card">
+        <h3>🗓️ Tambah Agenda Sekolah (Admin)</h3>
+        <form onsubmit="submitAgenda(event)">
+          <div class="form-grid">
+            <div class="field"><label>Nama Kegiatan</label><input name="nama" placeholder="Contoh: Rapat Orang Tua Murid" required></div>
+            <div class="field"><label>Tanggal Mulai</label><input type="date" name="tanggalMulai" required value="${new Date().toISOString().slice(0,10)}"></div>
+            <div class="field"><label>Tanggal Selesai</label><input type="date" name="tanggalSelesai" required value="${new Date().toISOString().slice(0,10)}"></div>
+          </div>
+          <div class="btn-row"><button class="btn btn-primary" type="submit">💾 Simpan Agenda</button></div>
+        </form>
+      </div>
+    `;
+  }
+
+  // Urutkan agenda dari tanggal terbaru/terdekat
+  const agendaUrut = [...DB.agenda].sort((a, b) => String(a.tanggalMulai).localeCompare(String(b.tanggalMulai)));
+
+  return `
+    ${formHtml}
+    <div class="card">
+      <h3>📅 Daftar Agenda Sekolah</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 50px; text-align:center;">No</th>
+              <th>Tanggal Mulai</th>
+              <th>Tanggal Selesai</th>
+              <th>Nama Kegiatan</th>
+              ${isAdmin ? '<th style="width: 100px; text-align:center;">Aksi</th>' : ''}
+            </tr>
+          </thead>
+          <tbody>
+            ${agendaUrut.map((a, i) => `
+              <tr>
+                <td style="text-align:center;">${i+1}</td>
+                <td>${esc(a.tanggalMulai)}</td>
+                <td>${esc(a.tanggalSelesai)}</td>
+                <td><b>${esc(a.nama)}</b></td>
+                ${isAdmin ? `<td style="text-align:center;"><button class="btn btn-danger btn-sm" onclick="deleteData('agenda','${a.id}')">Hapus</button></td>` : ''}
+              </tr>
+            `).join('') || `<tr><td colspan="${isAdmin ? 5 : 4}" class="empty" style="text-align:center;">Belum ada agenda sekolah.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
 
     // ==========================================
     // CETAK PDF MENGGUNAKAN IFRAME (ANTI POPUP)
