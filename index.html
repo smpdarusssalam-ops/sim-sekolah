@@ -305,7 +305,7 @@
           <div class="card" style="margin:0;"><div style="font-size:1.5rem; font-weight:800; color:var(--warning)">${DB.kasus.length}</div><div style="font-size:.8rem; color:var(--muted)">Kasus</div></div>
           <div class="card" style="margin:0;"><div style="font-size:1.5rem; font-weight:800; color:var(--danger)">${DB.agenda.length}</div><div style="font-size:.8rem; color:var(--muted)">Agenda</div></div>
         </div>
-        <div class="card"><h3>⚡ Tahun Ajaran Aktif: <span style="color:var(--primary)">${TAHUN_ARAN_AKTIF || TAHUN_AJARAN_AKTIF}</span></h3></div>
+        <div class="card"><h3>⚡ Tahun Ajaran Aktif: <span style="color:var(--primary)">${TAHUN_AJARAN_AKTIF}</span></h3></div>
         <div class="card"><h3>Aktivitas Terbaru</h3><div class="table-wrap"><table><thead><tr><th>User</th><th>Aksi</th><th>Entitas</th></tr></thead><tbody>${DB.audit.slice(0,5).map(a => `<tr><td>${esc(a.user)}</td><td>${esc(a.action)}</td><td>${esc(a.entity)}</td></tr>`).join('') || '<tr><td colspan="3" class="empty">Belum ada</td></tr>'}</tbody></table></div></div>`;
     }
 
