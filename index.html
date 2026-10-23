@@ -268,14 +268,14 @@
     // NAVIGASI & HELPER
     // ==========================================
     function getMyWaliKelasInfo() {
-      if (!CURRENT_USER || !CURRENT_USER.nama) return null;
-      const firstName = CURRENT_USER.nama.split(' ')[0].toLowerCase(); 
-      const myGuru = DB.guru.find(g => g.nama && g.nama.toLowerCase().includes(firstName));
-      if (!myGuru) return null;
-      const myKelas = DB.kelas.find(k => k.waliKelasId === myGuru.id);
-      if (!myKelas) return null; 
-      return { guruId: myGuru.id, kelasId: myKelas.id, kelasNama: myKelas.nama };
-    }
+  if (!CURRENT_USER || !CURRENT_USER.nama) return null;
+  // Cocokkan nama user dengan nama di sheet Guru secara persis
+  const myGuru = DB.guru.find(g => g.nama && g.nama.trim().toLowerCase() === CURRENT_USER.nama.trim().toLowerCase());
+  if (!myGuru) return null;
+  const myKelas = DB.kelas.find(k => k.waliKelasId === myGuru.id);
+  if (!myKelas) return null; 
+  return { guruId: myGuru.id, kelasId: myKelas.id, kelasNama: myKelas.nama };
+}
 
     function navigate(route) {
       document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.route === route));
@@ -421,8 +421,8 @@
       
       let myGuruId = null;
       if (isGuru || waliInfo) {
-        const firstName = CURRENT_USER.nama.split(' ')[0].toLowerCase(); 
-        const myGuru = DB.guru.find(g => g.nama.toLowerCase().includes(firstName));
+        // Sama, gunakan pencocokan persis
+        const myGuru = DB.guru.find(g => g.nama && g.nama.trim().toLowerCase() === CURRENT_USER.nama.trim().toLowerCase());
         if (myGuru) myGuruId = myGuru.id;
       }
 
