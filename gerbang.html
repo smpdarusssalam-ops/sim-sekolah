@@ -839,7 +839,6 @@ async function exportLaporan(jenis, format) {
     else if (jenis === 'tahunan') params.tahun = document.getElementById('inputTahun').value;
     
     try {
-        // 1. Tarik data mentah dari GAS
         const res = await apiGet(params);
         document.getElementById('loadingIndicator').style.display = 'none';
         document.getElementById('loadingIndicator').innerText = 'Memuat data...';
@@ -853,7 +852,7 @@ async function exportLaporan(jenis, format) {
 
         const data = res.data;
 
-        // 2. Jika format Excel (CSV)
+        // === FORMAT EXCEL (CSV) ===
         if (format === 'xlsx') {
             let csvContent = "Tanggal,NIS,Nama,Kelas,Jam Masuk,Jam Pulang\n";
             data.forEach(d => {
@@ -874,6 +873,95 @@ async function exportLaporan(jenis, format) {
             return;
         }
 
+        // === FORMAT PDF (DENGAN KOP SURAT & TTD) ===
+        let rowsHtml = data.map((d, i) => `
+            <tr>
+                <td style="text-align:center;">${i+1}</td>
+                <td>${formatTgl(d.tanggal)}</td>
+                <td>${d.nis}</td>
+                <td>${d.nama}</td>
+                <td>${d.kelas}</td>
+                <td style="text-align:center;">${formatJam(d.jamMasuk)}</td>
+                <td style="text-align:center;">${formatJam(d.jamPulang)}</td>
+            </tr>
+        `).join('');
+
+        let periodeTeks = jenis === 'harian' ? formatTgl(params.tanggal) : (jenis === 'bulanan' ? `${params.bulan}/${params.tahun}` : params.tahun);
+        
+        // Tanggal hari ini untuk TTD
+        const now = new Date();
+        const tglTtd = now.toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'});
+
+        // Desain Kop Surat & Tanda Tangan
+        let kopSurat = `
+            <div style="display:flex; align-items:center; border-bottom:3px solid #000; padding-bottom:10px; margin-bottom:20px;">
+                <div style="width:100px; text-align:center;">
+                    <img src="https://via.placeholder.com/80" style="max-width:80px; max-height:80px; border-radius:50%;">
+                </div>
+                <div style="flex:1; text-align:center; padding:0 10px;">
+                    <div style="font-size:14px; font-weight:bold;">YAYASAN PENDIDIKAN DARUSSALAM</div>
+                    <div style="font-size:20px; font-weight:bold; margin:2px 0;">SMP DARUSSALAM</div>
+                    <div style="font-size:11px;">Akreditasi A</div>
+                    <div style="font-size:11px;">Jl. Raya Sekolah No. 1, Garut</div>
+                    <div style="font-size:11px;">Telp: 0262-xxxx | Email: info@sekolah.sch.id</div>
+                </div>
+            </div>
+        `;
+
+        let ttdHtml = `
+            <div style="display:flex; justify-content:space-between; margin-top:40px; font-size:13px;">
+                <div style="text-align:center; width:45%;">
+                    <p>Mengetahui,</p>
+                    <p>Kepala Sekolah</p>
+                    <br><br><br><br>
+                    <p style="font-weight:bold; text-decoration:underline;">Drs. H. Ahmad, M.Pd</p>
+                    <p>NRKS: 123456789</p>
+                </div>
+                <div style="text-align:center; width:45%;">
+                    <p>Garut, ${tglTtd}</p>
+                    <p>Admin Gerbang</p>
+                    <br><br><br><br>
+                    <p style="font-weight:bold; text-decoration:underline;">Petugas Gerbang</p>
+                    <p>NIP: -</p>
+                </div>
+            </div>
+        `;
+
+        let htmlPrint = `
+            <html><head><title>Cetak Laporan</title>
+            <style>
+                body { font-family: 'Times New Roman', Times, serif; padding: 20px; font-size: 12px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th, td { border: 1px solid #000; padding: 8px; }
+                th { background: #eee; text-align: left; }
+                h3 { text-align: center; text-decoration: underline; margin-bottom: 5px; font-size: 16px; }
+                p { text-align: center; margin-bottom: 20px; }
+            </style></head>
+            <body>
+                ${kopSurat}
+                <h3>LAPORAN ABSENSI GERBANG</h3>
+                <p>Periode: ${periodeTeks}</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>No</th><th>Tanggal</th><th>NIS</th><th>Nama</th><th>Kelas</th><th>Masuk</th><th>Pulang</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
+                ${ttdHtml}
+            </body></html>
+        `;
+
+        printHTMLLaporan(htmlPrint);
+        
+    } catch (err) {
+        document.getElementById('loadingIndicator').style.display = 'none';
+        info.className = 'info-msg err';
+        info.innerHTML = '❌ Error: ' + err.message;
+        info.style.display = 'block';
+    }
+}
         // 3. Jika format PDF (Cetak Langsung via Iframe)
         let rowsHtml = data.map((d, i) => `
             <tr>
