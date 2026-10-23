@@ -411,22 +411,21 @@
         initSpeech();
     }
 
-    function ucapkanTerimaKasih(nama) {
-        if (!('speechSynthesis' in window)) return;
-        try {
-            window.speechSynthesis.cancel();
-            initSpeech();
-            const namaDepan = (nama || '').split(' ')[0];
-            const text = 'Terima kasih, ' + namaDepan;
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'id-ID';
-            utterance.rate = 1.0;
-            utterance.pitch = 1.1;
-            utterance.volume = 1.0;
-            if (suaraTersedia) utterance.voice = suaraTersedia;
-            window.speechSynthesis.speak(utterance);
-        } catch (e) { console.log('Error TTS:', e); }
-    }
+    // Ganti fungsi ucapkanTerimaKasih dengan ini:
+function ucapkanTeks(teks) {
+    if (!('speechSynthesis' in window)) return;
+    try {
+        window.speechSynthesis.cancel();
+        initSpeech();
+        const utterance = new SpeechSynthesisUtterance(teks);
+        utterance.lang = 'id-ID';
+        utterance.rate = 1.0;
+        utterance.pitch = 1.1;
+        utterance.volume = 1.0;
+        if (suaraTersedia) utterance.voice = suaraTersedia;
+        window.speechSynthesis.speak(utterance);
+    } catch (e) { console.log('Error TTS:', e); }
+}
 
     document.addEventListener('click', function() {
         initAudio(); initSpeech();
@@ -602,16 +601,40 @@
     });
 
     async function prosesAbsen(nis) {
-        const resultBox = document.getElementById('resultBox');
-        resultBox.className = 'result';
-        resultBox.style.display = 'block';
-        resultBox.innerHTML = '<p>⏳ Memproses...</p>';
+    const resultBox = document.getElementById('resultBox');
+    resultBox.className = 'result';
+    resultBox.style.display = 'block';
+    resultBox.innerHTML = '<p>⏳ Memproses...</p>';
+    
+    try {
+        const res = await apiPost({ action: 'absen', nis: nis });
         
-        try {
-            const res = await apiPost({ action: 'absen', nis: nis });
-            
-            if (res.success) {
-                const isMasuk = res.mode === 'masuk';
+        if (res.success) {
+            const isMasuk = res.mode === 'masuk';
+            const namaDepan = (res.siswa.nama || '').split(' ')[0];
+
+            // ==========================================
+            // JIKA SISWA SUDAH ABSEN (SCAN KEDUA KALI)
+            // ==========================================
+            if (res.duplicate) {
+                // Tampilan warna kuning/oranye
+                resultBox.className = 'result success-pulang'; // pakai style oranye
+                resultBox.innerHTML = 
+                    '<h2>⚠️ Sudah Absen</h2>' +
+                    '<div class="info-row"><span class="label">Nama</span><span class="value">' + res.siswa.nama + '</span></div>' +
+                    '<div class="info-row"><span class="label">Status</span><span class="value">' + res.message + '</span></div>' +
+                    '<div class="info-row"><span class="label">Jam ' + (isMasuk ? 'Masuk' : 'Pulang') + '</span><span class="value">' + formatJam(res.jam) + '</span></div>';
+                
+                // Bunyi peringatan (Beep rendah)
+                beep(400, 0.2); setTimeout(() => beep(400, 0.3), 200);
+                // Suara TTS peringatan
+                setTimeout(() => ucapkanTeks(`Anda sudah absen, ${namaDepan}`), 300);
+
+            } 
+            // ==========================================
+            // JIKA ABSEN BERHASIL (SCAN PERTAMA KALI)
+            // ==========================================
+            else {
                 resultBox.className = 'result ' + (isMasuk ? 'success-masuk' : 'success-pulang');
                 
                 if (isMasuk) {
@@ -620,7 +643,8 @@
                     beep(900, 0.1); setTimeout(() => beep(1200, 0.15), 120);
                 }
                 
-                setTimeout(() => ucapkanTerimaKasih(res.siswa.nama), 350);
+                // Suara TTS terima kasih
+                setTimeout(() => ucapkanTeks(`Terima kasih, ${namaDepan}`), 350);
                 
                 resultBox.innerHTML = 
                     '<h2>' + (isMasuk ? '✅ Absen Masuk Berhasil' : '👋 Absen Pulang Berhasil') + '</h2>' +
@@ -628,23 +652,24 @@
                     '<div class="info-row"><span class="label">NIS</span><span class="value">' + res.siswa.nis + '</span></div>' +
                     '<div class="info-row"><span class="label">Kelas</span><span class="value">' + res.siswa.kelas + '</span></div>' +
                     '<div class="info-row"><span class="label">Jam ' + (isMasuk ? 'Masuk' : 'Pulang') + '</span><span class="value">' + formatJam(res.jam) + '</span></div>';
-                
-                setTimeout(loadLiveFeed, 1000);
-                updateRekap();
-            } else {
-                beep(300, 0.4);
-                resultBox.className = 'result error';
-                resultBox.innerHTML = '<h2>❌ Gagal</h2><p>' + (res.message || res.error) + '</p>';
             }
-        } catch (err) {
+            
+            setTimeout(loadLiveFeed, 1000);
+            updateRekap();
+        } else {
             beep(300, 0.4);
             resultBox.className = 'result error';
-            resultBox.innerHTML = '<h2>❌ Error</h2><p>' + err.message + '</p>';
+            resultBox.innerHTML = '<h2>❌ Gagal</h2><p>' + (res.message || res.error) + '</p>';
+            setTimeout(() => ucapkanTeks('Absen gagal'), 200);
         }
-        
-        if (currentMode === 'rfid') rfidInput.focus();
+    } catch (err) {
+        beep(300, 0.4);
+        resultBox.className = 'result error';
+        resultBox.innerHTML = '<h2>❌ Error</h2><p>' + err.message + '</p>';
     }
-
+    
+    if (currentMode === 'rfid') rfidInput.focus();
+}
     // =====================================================
     // ADMIN PANEL & LAPORAN
     // =====================================================
