@@ -834,20 +834,18 @@
 
   let dataGerbang = [];
   try {
-    // Tampilkan log di Console (F12) untuk memantau
-    console.log("Meminta data gerbang tanggal:", tanggal);
-    
     const resGerbang = await apiCall('laporan', 'absensiGerbang', { data: { jenis: 'harian', tanggal: tanggal } });
-    
     if (resGerbang.success && resGerbang.data) {
       dataGerbang = resGerbang.data;
-      console.log("Data gerbang berhasil diterima:", dataGerbang);
-    } else {
-      console.warn("Data gerbang kosong atau gagal dimuat dari server.");
+      console.log("✅ Data gerbang berhasil diterima:", dataGerbang);
+      
+      if (dataGerbang.length === 0) {
+        alert("⚠️ Server mengembalikan data KOSONG untuk tanggal ini.\nPastikan tanggal di aplikasi sama dengan tanggal scan di gerbang.");
+      }
     }
   } catch (e) {
     console.error("Gagal Fetch Gerbang:", e);
-    alert("⚠️ Gagal menarik data dari server gerbang! Pastikan Code.gs sudah di-Deploy (New Version) dan URL Web App benar.");
+    alert("⚠️ Gagal menarik data server gerbang. Pastikan Deploy Web App sudah versi terbaru (New Version).");
   }
 
   hideLoading();
@@ -872,23 +870,26 @@
   siswaList.forEach(siswa => {
     const existing = DB.absensi.find(a => a.siswaId === siswa.id && a.mapelId === mapelId && a.tanggal === tanggal);
     
-    // PINTAR: Cocokkan NIS dengan membuang spasi dan mengabaikan angka 0 di depan
+    // PINTAR: Cocokkan NIS sebagai teks, dan buang spasi
     const nisSiswa = String(siswa.nis).trim();
-    const scan = dataGerbang.find(g => {
-      const nisGerbang = String(g.nis).trim();
-      // Cocokkan persis ATAU abaikan 0 di depan
-      return nisGerbang === nisSiswa || nisGerbang.replace(/^0+/, '') === nisSiswa.replace(/^0+/, '');
-    });
+    const scan = dataGerbang.find(g => String(g.nis).trim() === nisSiswa);
 
     let badgeGerbang = `<span class="badge b-red">Tidak Scan</span>`;
     if (scan && scan.jamMasuk && scan.jamMasuk !== '-') {
-      badgeGerbang = `<span class="badge b-green">Hadir ${scan.jamMasuk}</span>`;
+      // PINTAR: Bersihkan format jam 1899 jika backend belum di-deploy
+      let jamTampil = scan.jamMasuk;
+      if (String(jamTampil).includes('1899-12-30T')) {
+        jamTampil = String(jamTampil).split('T')[1].substring(0, 5); // Ambil "06:36"
+      } else if (String(jamTampil).includes('T')) {
+        jamTampil = new Date(jamTampil).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
+      }
+      badgeGerbang = `<span class="badge b-green">Hadir ${jamTampil}</span>`;
     }
 
     let defaultStatus = 'Alfa'; 
     if (existing) {
       defaultStatus = existing.status;
-    } else if (scan && scan.jamMasuk) {
+    } else if (scan && scan.jamMasuk && scan.jamMasuk !== '-') {
       defaultStatus = 'Hadir'; 
     }
 
