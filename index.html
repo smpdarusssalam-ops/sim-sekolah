@@ -429,7 +429,7 @@ function getTandaTangan(role = 'guru', mapelId = null) {
         </div>`;
     }
 
-    function renderGuru() {
+ function renderGuru() {
   return `
     <div class="card" id="formGuruCard">
       <h3 id="formGuruTitle">💼 Tambah Guru</h3>
@@ -438,12 +438,19 @@ function getTandaTangan(role = 'guru', mapelId = null) {
         <div class="form-grid">
           <div class="field"><label>NUPTK / NIP</label><input name="nip" id="guruNip" required></div>
           <div class="field"><label>Nama Lengkap</label><input name="nama" id="guruNama" required></div>
-          <div class="field"><label>Mapel yang Diampu</label>
+          
+          <!-- UPDATE DI SINI: Tambah Tombol + Mapel -->
+          <div class="field">
+            <label style="display:flex; justify-content:space-between; align-items:center;">
+              Mapel yang Diampu
+              <button type="button" class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px; border-radius:4px;" onclick="tambahMapelBaru()">+ Mapel Baru</button>
+            </label>
             <select name="mapelId" id="guruMapel" required>
               <option value="">-- Pilih Mapel --</option>
               ${DB.mapel.map(m => `<option value="${m.id}">${m.nama}</option>`).join('')}
             </select>
           </div>
+
           <div class="field">
             <label>Kelas yang Diampu (Bisa pilih banyak)</label>
             <select name="kelasIds" id="guruKelasIds" multiple style="height: 100px;">
@@ -484,7 +491,7 @@ function getTandaTangan(role = 'guru', mapelId = null) {
     </div>`;
 }
 
-// Fungsi bantuan untuk mengubah ID Kelas menjadi Nama Kelas
+// Fungsi bantuan untuk menampilkan badge kelas
 function nKelasMengajar(idsStr) {
   if (!idsStr) return '<span class="badge b-red">Belum diset</span>';
   const ids = String(idsStr).split(',');
@@ -520,6 +527,48 @@ window.resetFormGuru = () => {
   document.getElementById('formGuruTitle').innerText = '💼 Tambah Guru';
   document.getElementById('btnSimpanGuru').innerText = '💾 Simpan Guru';
   document.getElementById('btnBatalGuru').style.display = 'none';
+};
+
+window.tambahMapelBaru = async () => {
+  const nama = prompt("Masukkan Nama Mata Pelajaran Baru:\n(Contoh: Bahasa Sunda)");
+  if (!nama) return;
+  
+  const kode = prompt("Masukkan Kode Mapel (3 huruf):\n(Contoh: BSD)", nama.substring(0, 3).toUpperCase());
+  if (!kode) return;
+
+  showLoading('Menyimpan mapel...');
+  try {
+    // Simpan ke database melalui API
+    const res = await apiCall('create', 'mapel', { data: { nama: nama, kode: kode } });
+    
+    // Tambahkan ke memori aplikasi
+    DB.mapel.push(res.data);
+    toast('Mapel baru berhasil ditambahkan!');
+    
+    // Simpan ID guru yang mungkin sedang diedit
+    const currentEditId = document.getElementById('guruId').value;
+    
+    // Refresh halaman form guru
+    navigate('guru');
+    
+    // Jika tadi sedang edit guru, kembalikan form ke mode edit dan pilih mapel barunya
+    if (currentEditId) {
+      setTimeout(() => {
+        editGuru(currentEditId);
+        document.getElementById('guruMapel').value = res.data.id;
+      }, 100);
+    } else {
+      // Jika tambah guru baru, langsung pilih mapel barunya
+      setTimeout(() => {
+        document.getElementById('guruMapel').value = res.data.id;
+      }, 100);
+    }
+    
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    hideLoading();
+  }
 };
 
 window.submitGuru = async (e) => {
@@ -1519,23 +1568,32 @@ window.submitJadwal = async (e) => {
     }
 
     async function deleteData(entity, id) {
-      if (!confirm('Apakah Anda yakin ingin menghapus data ini secara permanen?')) return;
-      showLoading('Menghapus...');
-      try {
-        const res = await apiCall('delete', entity, { id: id });
-        if (res.ok || res.success) {
-          DB[entity] = DB[entity].filter(x => x.id !== id); 
-          toast('Data berhasil terhapus');
-          navigate(entity);
-        } else {
-          throw new Error('Server menolak penghapusan');
-        }
-      } catch (err) { 
-        alert('Gagal menghapus: ' + err.message); 
-      } finally { 
-        hideLoading(); 
+  if (!confirm('Apakah Anda yakin ingin menghapus data ini secara permanen?')) return;
+  showLoading('Menghapus...');
+  try {
+    const res = await apiCall('delete', entity, { id: id });
+    if (res.ok || res.success) {
+      // Hapus data dari memori aplikasi
+      DB[entity] = DB[entity].filter(x => x.id !== id); 
+      toast('Data berhasil terhapus');
+      
+      // KUNCI PERBAIKAN: Cek apakah yang dihapus adalah sub-menu
+      if (entity === 'jadwal') {
+        editJadwalId = null; // Reset form edit jadwal jika ada
+        activateSubTab('jadwal'); // Refresh tabel jadwal
+      } else {
+        navigate(entity); // Refresh halaman utama (seperti siswa, guru, kasus)
       }
+      
+    } else {
+      throw new Error('Server menolak penghapusan');
     }
+  } catch (err) { 
+    alert('Gagal menghapus: ' + err.message); 
+  } finally { 
+    hideLoading(); 
+  }
+}
 window.submitAgenda = async (e) => {
   e.preventDefault();
   const data = Object.fromEntries(new FormData(e.target).entries());
