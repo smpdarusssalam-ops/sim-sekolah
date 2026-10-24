@@ -272,7 +272,7 @@
     function getVal(key, def) { return DB.pengaturan.find(p => p.key === key)?.value || def; }
 
     // ==========================================
-    // DESAIN KOP SURAT & TTD
+    // KOP SURAT & TTD
     // ==========================================
     function getKopSurat() {
       const logoUrl = getVal('logo', '');
@@ -614,8 +614,249 @@
       if (t === 'absensi' && subTabAbsensi === 'rekap') renderRekapAbsensi();
     }
 
+    // ==========================================
+    // LOGIKA NILAI & ABSENSI (ANTI-ERROR)
+    // ==========================================
+    window.muatTabelNilai = () => {
+      try {
+        const mapelId = document.getElementById('inpMapel')?.value;
+        const kelasId = document.getElementById('inpKelas')?.value;
+        const semester = document.getElementById('inpSem')?.value;
+        const jmlHarian = parseInt(document.getElementById('inpHarianCount')?.value || 3);
+        
+        if (!mapelId || !kelasId) return alert("⚠️ Pilih Mata Pelajaran dan Kelas terlebih dahulu!");
+
+        const siswaList = DB.siswa.filter(s => String(s.kelasId).trim() === String(kelasId).trim());
+        
+        if (siswaList.length === 0) {
+          return document.getElementById('tabelNilaiContainer').innerHTML = `<div class="card"><p class="empty" style="text-align:center; color:red;">Tidak ada siswa di kelas ini.</p></div>`;
+        }
+
+        let tableHtml = `<div class="card"><h3>Daftar Nilai: ${nMapel(mapelId)} - ${nKelas(kelasId)} (${semester})</h3><div class="table-wrap"><table><thead><tr><th>Nama Siswa</th>${Array.from({length: jmlHarian}, (_, i) => `<th>H${i+1}</th>`).join('')}<th>UTS</th><th>UAS</th><th>Akhir</th></tr></thead><tbody>`;
+        
+        siswaList.forEach(siswa => {
+          const existing = DB.nilai.find(n => {
+            const matchSiswa = String(n.siswaId).trim() === String(siswa.id).trim();
+            const matchMapel = String(n.mapelId).trim() === String(mapelId).trim();
+            const matchSemester = String(n.semester).trim().toLowerCase() === String(semester).trim().toLowerCase();
+            const matchTahun = String(n.tahunAjaran).trim() === String(TAHUN_AJARAN_AKTIF).trim();
+            return matchSiswa && matchMapel && matchSemester && matchTahun;
+          });
+
+          let harianArr = existing && existing.harian ? String(existing.harian).split(',').map(Number) : [];
+          const uts = existing && existing.uts ? existing.uts : '';
+          const uas = existing && existing.uas ? existing.uas : '';
+          
+          tableHtml += `<tr data-siswa="${siswa.id}" data-nilai-id="${existing ? existing.id : ''}"><td>${siswa.nama}</td>`;
+          for (let i = 0; i < jmlHarian; i++) tableHtml += `<td><input type="number" class="nilai-input inp-nilai" data-type="harian" value="${harianArr[i] !== undefined ? harianArr[i] : ''}"></td>`;
+          tableHtml += `<td><input type="number" class="nilai-input inp-nilai" data-type="uts" value="${uts}"></td><td><input type="number" class="nilai-input inp-nilai" data-type="uas" value="${uas}"></td><td><b class="nilai-akhir-text">-</b></td></tr>`;
+        });
+        
+        tableHtml += `</tbody></table></div><div class="btn-row"><button type="button" class="btn btn-success" onclick="simpanSemuaNilai('${mapelId}', '${kelasId}', '${semester}')">💾 Simpan Nilai (Bulk)</button></div></div>`;
+        
+        document.getElementById('tabelNilaiContainer').innerHTML = tableHtml;
+        document.querySelectorAll('.inp-nilai').forEach(inp => inp.addEventListener('input', (e) => window.hitungNilaiAkhirRow(e.target.closest('tr'))));
+        document.querySelectorAll('#tabelNilaiContainer tbody tr').forEach(tr => window.hitungNilaiAkhirRow(tr));
+
+      } catch (error) {
+        console.error(error);
+        alert("❌ Gagal memuat tabel nilai: " + error.message);
+      }
+    };
+
+    window.hitungNilaiAkhirRow = (tr) => {
+      let totalHarian = 0, countHarian = 0, uts = 0, uas = 0;
+      tr.querySelectorAll('.inp-nilai').forEach(inp => {
+        const val = parseFloat(inp.value) || 0;
+        if (inp.dataset.type === 'harian') { totalHarian += val; countHarian++; }
+        else if (inp.dataset.type === 'uts') uts = val;
+        else if (inp.dataset.type === 'uas') uas = val;
+      });
+      const akhir = Math.round((((countHarian > 0 ? totalHarian / countHarian : 0) + uts + uas) / 3) * 100) / 100;
+      tr.querySelector('.nilai-akhir-text').textContent = akhir;
+    };
+
+    window.simpanSemuaNilai = async (mapelId, kelasId, semester) => {
+      try {
+        const rows = document.querySelectorAll('#tabelNilaiContainer tbody tr');
+        if (rows.length === 0) return alert('Tidak ada data untuk disimpan.');
+        
+        showLoading('Menyimpan...'); 
+        const payload = [];
+        
+        for (const tr of rows) {
+          const siswaId = tr.dataset.siswa, nilaiId = tr.dataset.nilaiId;
+          let harianArr = [], uts = 0, uas = 0;
+          tr.querySelectorAll('.inp-nilai').forEach(inp => {
+            if (inp.dataset.type === 'harian') harianArr.push(inp.value === '' ? 0 : Number(inp.value));
+            else if (inp.dataset.type === 'uts') uts = inp.value === '' ? 0 : Number(inp.value);
+            else if (inp.dataset.type === 'uas') uas = inp.value === '' ? 0 : Number(inp.value);
+          });
+          payload.push({ id: nilaiId || '', siswaId, mapelId, semester, tahunAjaran: TAHUN_AJARAN_AKTIF, harian: harianArr.join(','), uts, uas });
+        }
+
+        await apiCall('bulkSave', 'nilai', { data: payload });
+        toast('Nilai berhasil disimpan!');
+        
+        // Tarik data terbaru dari server agar ID tersinkronisasi
+        const allRes = await apiCall('getAllData');
+        DB = { ...DB, ...allRes.data };
+        muatTabelNilai();
+      } catch (e) { 
+        console.error("Gagal simpan nilai:", e);
+        alert('❌ Gagal menyimpan nilai: ' + e.message); 
+      } finally { 
+        hideLoading(); 
+      }
+    };
+
+    window.muatTabelAbsensi = async () => {
+      try {
+        const mapelId = document.getElementById('inpAbsenMapel')?.value;
+        const kelasId = document.getElementById('inpAbsenKelas')?.value;
+        const tanggal = document.getElementById('inpAbsenTgl')?.value;
+        
+        if (!mapelId || !kelasId || !tanggal) return alert('⚠️ Lengkapi Mapel, Kelas, dan Tanggal terlebih dahulu!');
+
+        const siswaList = DB.siswa.filter(s => String(s.kelasId).trim() === String(kelasId).trim() && (!s.status || String(s.status).toLowerCase() === 'aktif'));
+        
+        if (siswaList.length === 0) {
+          return document.getElementById('tabelAbsensiContainer').innerHTML = `<div class="card"><p class="empty" style="text-align:center; color:red;">Tidak ada siswa aktif di kelas ini.</p></div>`;
+        }
+
+        showLoading('Menarik data gerbang...');
+        let dataGerbang = [];
+        try {
+          const resGerbang = await apiCall('laporan', 'absensiGerbang', { data: { jenis: 'harian', tanggal: tanggal } });
+          if (resGerbang.success && resGerbang.data) dataGerbang = resGerbang.data;
+        } catch (e) { console.log("Info: Data gerbang tidak ditarik."); }
+        hideLoading();
+
+        let tableHtml = `
+          <div class="card">
+            <h3>Validasi Absensi ${nKelas(kelasId)} - ${nMapel(mapelId)} (${formatTanggalIndo(tanggal)})</h3>
+            <div class="hint" style="margin-bottom:10px;">💡 Status <b>Hadir</b> otomatis terisi jika siswa sudah scan di gerbang. Guru cukup menyesuaikan jika ada siswa bolos.</div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Nama Siswa</th><th>Kelas</th><th>Info Gerbang</th><th>Status Kelas</th><th>Keterangan</th>
+                  </tr>
+                </thead>
+                <tbody>`;
+
+        siswaList.forEach(siswa => {
+          const existing = DB.absensi.find(a => String(a.siswaId).trim() === String(siswa.id).trim() && String(a.mapelId).trim() === String(mapelId).trim() && String(a.tanggal).trim() === String(tanggal).trim());
+          
+          const nisSiswa = String(siswa.nis).trim();
+          const scan = dataGerbang.find(g => String(g.nis).trim() === nisSiswa);
+
+          let badgeGerbang = `<span class="badge b-red">Tidak Scan</span>`;
+          if (scan && scan.jamMasuk && scan.jamMasuk !== '-') {
+            let jamTampil = scan.jamMasuk;
+            if (String(jamTampil).includes('1899-12-30T')) jamTampil = String(jamTampil).split('T')[1].substring(0, 5);
+            else if (String(jamTampil).includes('T')) jamTampil = new Date(jamTampil).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
+            badgeGerbang = `<span class="badge b-green">Hadir ${jamTampil}</span>`;
+          }
+
+          let defaultStatus = 'Alfa'; 
+          if (existing) defaultStatus = existing.status;
+          else if (scan && scan.jamMasuk && scan.jamMasuk !== '-') defaultStatus = 'Hadir'; 
+
+          const ket = existing ? existing.keterangan : '';
+
+          tableHtml += `
+            <tr data-siswa="${siswa.id}" data-absen-id="${existing ? existing.id : ''}">
+              <td><b>${esc(siswa.nama)}</b><br><span style="font-size:.72rem;color:var(--muted);">${esc(siswa.nis)}</span></td>
+              <td><span class="badge b-blue">${esc(nKelas(siswa.kelasId))}</span></td>
+              <td>${badgeGerbang}</td>
+              <td>
+                <select class="inp-absen-status" style="width:100px;">
+                  <option value="Hadir" ${defaultStatus==='Hadir'?'selected':''}>Hadir</option>
+                  <option value="Sakit" ${defaultStatus==='Sakit'?'selected':''}>Sakit</option>
+                  <option value="Izin" ${defaultStatus==='Izin'?'selected':''}>Izin</option>
+                  <option value="Alfa" ${defaultStatus==='Alfa'?'selected':''}>Alfa</option>
+                </select>
+              </td>
+              <td><input type="text" class="inp-absen-ket" value="${esc(ket)}" placeholder="Opsional"></td>
+            </tr>`;
+        });
+
+        tableHtml += `
+                </tbody>
+              </table>
+            </div>
+            <div class="btn-row">
+              <button type="button" class="btn btn-success" onclick="simpanSemuaAbsensi('${mapelId}', '${tanggal}')">💾 Validasi & Simpan Absensi</button>
+            </div>
+          </div>`;
+
+        document.getElementById('tabelAbsensiContainer').innerHTML = tableHtml;
+      } catch (error) {
+        hideLoading(); console.error(error);
+        alert("❌ Gagal memuat tabel absensi: " + error.message);
+      }
+    };
+
+    window.simpanSemuaAbsensi = async (mapelId, tanggal) => {
+      try {
+        const rows = document.querySelectorAll('#tabelAbsensiContainer tbody tr');
+        if (rows.length === 0) return alert('Tidak ada data absensi untuk disimpan.');
+        
+        showLoading('Menyimpan...'); 
+        const payload = [];
+        for (const tr of rows) {
+          const siswaId = tr.dataset.siswa, absenId = tr.dataset.absenId;
+          const status = tr.querySelector('.inp-absen-status').value;
+          const keterangan = tr.querySelector('.inp-absen-ket').value;
+          payload.push({ id: absenId || '', siswaId, mapelId, tanggal, status, keterangan });
+        }
+
+        await apiCall('bulkSave', 'absensi', { data: payload });
+        toast('Absensi berhasil divalidasi & disimpan!');
+        
+        const allRes = await apiCall('getAllData');
+        DB = { ...DB, ...allRes.data };
+        muatTabelAbsensi();
+      } catch (e) { 
+        console.error("Gagal simpan absensi:", e);
+        alert('❌ Gagal menyimpan absensi: ' + e.message); 
+      } finally { 
+        hideLoading(); 
+      }
+    };
+
+    window.renderRekapAbsensi = () => {
+      const kelasId = document.getElementById('rekapAbsenKelas').value;
+      const mapelId = document.getElementById('rekapAbsenMapel').value;
+      const siswaList = DB.siswa.filter(s => s.kelasId === kelasId);
+      const absensiMapel = DB.absensi.filter(a => a.mapelId === mapelId && siswaList.some(s => s.id === a.siswaId));
+      const tanggalList = [...new Set(absensiMapel.map(a => a.tanggal))].sort();
+      if (tanggalList.length === 0) return document.getElementById('rekapAbsenContainer').innerHTML = '<p class="empty" style="text-align:center;">Belum ada data absensi.</p>';
+
+      let tableHtml = `<div class="table-wrap"><table><thead><tr><th>Nama Siswa</th>${tanggalList.map(t => `<th>${formatTanggalIndo(t)}</th>`).join('')}</tr></thead><tbody>`;
+      siswaList.forEach(siswa => {
+        tableHtml += `<tr><td><b>${siswa.nama}</b></td>`;
+        tanggalList.forEach(tgl => {
+          const record = DB.absensi.find(a => a.siswaId === siswa.id && a.mapelId === mapelId && a.tanggal === tgl);
+          let badge = '-';
+          if (record) {
+            const color = record.status === 'Hadir' ? 'b-green' : record.status === 'Alfa' ? 'b-red' : 'b-yellow';
+            badge = `<span class="badge ${color}">${record.status.charAt(0)}</span>`;
+          }
+          tableHtml += `<td style="text-align:center;">${badge}</td>`;
+        });
+        tableHtml += `</tr>`;
+      });
+      tableHtml += `</tbody></table></div><div class="hint" style="margin-top:10px;">Keterangan: H=Hadir, S=Sakit, I=Izin, A=Alfa</div>`;
+      document.getElementById('rekapAbsenContainer').innerHTML = tableHtml;
+    };
+
+    // ==========================================
+    // JADWAL & ADMIN
+    // ==========================================
     window.filterGuruJadwal = () => {
-      const mapelId = document.getElementById('jadwalMapel').value;
+      const mapelId = document.getElementById('jadwalMapel')?.value;
       const selGuru = document.getElementById('jadwalGuru'); if (!selGuru) return;
       const filteredGuru = DB.guru.filter(g => String(g.mapelId) === String(mapelId));
       if (filteredGuru.length > 0) selGuru.innerHTML = filteredGuru.map(g => `<option value="${g.id}">${g.nama}</option>`).join('');
@@ -662,183 +903,9 @@
       } catch (e) { toast(e.message, 'error'); } finally { hideLoading(); }
     };
 
-  window.muatTabelNilai = () => {
-  try {
-    const mapelId = document.getElementById('inpMapel')?.value;
-    const kelasId = document.getElementById('inpKelas')?.value;
-    const semester = document.getElementById('inpSem')?.value;
-    const jmlHarian = parseInt(document.getElementById('inpHarianCount')?.value || 3);
-    
-    if (!mapelId || !kelasId) return alert("⚠️ Pilih Mata Pelajaran dan Kelas terlebih dahulu!");
-
-    const siswaList = DB.siswa.filter(s => String(s.kelasId).trim() === String(kelasId).trim());
-    
-    if (siswaList.length === 0) {
-      return document.getElementById('tabelNilaiContainer').innerHTML = `<div class="card"><p class="empty" style="text-align:center; color:red;">Tidak ada siswa di kelas ini.</p></div>`;
-    }
-
-    let tableHtml = `<div class="card"><h3>Daftar Nilai: ${nMapel(mapelId)} - ${nKelas(kelasId)} (${semester})</h3><div class="table-wrap"><table><thead><tr><th>Nama Siswa</th>${Array.from({length: jmlHarian}, (_, i) => `<th>H${i+1}</th>`).join('')}<th>UTS</th><th>UAS</th><th>Akhir</th></tr></thead><tbody>`;
-    
-    let dataDitemukan = 0;
-
-    siswaList.forEach(siswa => {
-      // PERBAIKAN: Pencocokan ID dan Teks dibuat lebih kebal (mengabaikan spasi dan huruf besar/kecil)
-      const existing = DB.nilai.find(n => {
-        const matchSiswa = String(n.siswaId).trim() === String(siswa.id).trim();
-        const matchMapel = String(n.mapelId).trim() === String(mapelId).trim();
-        const matchSemester = String(n.semester).trim().toLowerCase() === String(semester).trim().toLowerCase();
-        const matchTahun = String(n.tahunAjaran).trim() === String(TAHUN_AJARAN_AKTIF).trim();
-        return matchSiswa && matchMapel && matchSemester && matchTahun;
-      });
-
-      if (existing) dataDitemukan++;
-
-      let harianArr = existing && existing.harian ? String(existing.harian).split(',').map(Number) : [];
-      const uts = existing && existing.uts ? existing.uts : '';
-      const uas = existing && existing.uas ? existing.uas : '';
-      
-      tableHtml += `<tr data-siswa="${siswa.id}" data-nilai-id="${existing ? existing.id : ''}"><td>${siswa.nama}</td>`;
-      for (let i = 0; i < jmlHarian; i++) tableHtml += `<td><input type="number" class="nilai-input inp-nilai" data-type="harian" value="${harianArr[i] !== undefined ? harianArr[i] : ''}"></td>`;
-      tableHtml += `<td><input type="number" class="nilai-input inp-nilai" data-type="uts" value="${uts}"></td><td><input type="number" class="nilai-input inp-nilai" data-type="uas" value="${uas}"></td><td><b class="nilai-akhir-text">-</b></td></tr>`;
-    });
-    
-    tableHtml += `</tbody></table></div><div class="btn-row"><button type="button" class="btn btn-success" onclick="simpanSemuaNilai('${mapelId}', '${kelasId}', '${semester}')">💾 Simpan Nilai (Bulk)</button>
-    
-    document.getElementById('tabelNilaiContainer').innerHTML = tableHtml;
-    document.querySelectorAll('.inp-nilai').forEach(inp => inp.addEventListener('input', (e) => hitungNilaiAkhirRow(e.target.closest('tr'))));
-    document.querySelectorAll('#tabelNilaiContainer tbody tr').forEach(tr => hitungNilaiAkhirRow(tr));
-
-    // Pesan bantuan di Console (F12) untuk mendeteksi masalah
-    console.log(`Pencarian Nilai: Mapel=${mapelId}, Kelas=${kelasId}, Sem=${semester}, TA=${TAHUN_AJARAN_AKTIF}`);
-    console.log(`Data nilai ditemukan di memori: ${dataDitemukan} baris.`);
-    if (dataDitemukan === 0) {
-      console.warn("Data nilai tidak ditemukan. Kemungkinan ID Siswa/Mapel di sheet Nilai tidak cocok, atau belum tersimpan di Tahun Ajaran ini.");
-    }
-
-  } catch (error) {
-    console.error(error);
-    alert("❌ Gagal memuat tabel nilai: " + error.message);
-  }
-};
-window.hitungNilaiAkhirRow = (tr) => {
-  let totalHarian = 0, countHarian = 0, uts = 0, uas = 0;
-  tr.querySelectorAll('.inp-nilai').forEach(inp => {
-    const val = parseFloat(inp.value) || 0;
-    if (inp.dataset.type === 'harian') { totalHarian += val; countHarian++; }
-    else if (inp.dataset.type === 'uts') uts = val;
-    else if (inp.dataset.type === 'uas') uas = val;
-  });
-  const nilaiAkhir = Math.round((((countHarian > 0 ? totalHarian / countHarian : 0) + uts + uas) / 3) * 100) / 100;
-  tr.querySelector('.nilai-akhir-text').textContent = nilaiAkhir;
-};
-    
-window.muatTabelAbsensi = async () => {
-  try {
-    const mapelId = document.getElementById('inpAbsenMapel')?.value;
-    const kelasId = document.getElementById('inpAbsenKelas')?.value;
-    const tanggal = document.getElementById('inpAbsenTgl')?.value;
-    
-    console.log("Tombol Absensi diklik. Mapel:", mapelId, "Kelas:", kelasId, "Tgl:", tanggal);
-
-    if (!mapelId || !kelasId || !tanggal) return alert('⚠️ Lengkapi Mapel, Kelas, dan Tanggal terlebih dahulu!');
-
-    const siswaList = DB.siswa.filter(s => String(s.kelasId).trim() === String(kelasId).trim() && (!s.status || String(s.status).toLowerCase() === 'aktif'));
-    
-    console.log("Siswa aktif ditemukan:", siswaList.length);
-
-    if (siswaList.length === 0) {
-      return document.getElementById('tabelAbsensiContainer').innerHTML = `<div class="card"><p class="empty" style="text-align:center; color:red;">Tidak ada siswa aktif di kelas ini. (Total siswa di database: ${DB.siswa.length})</p></div>`;
-    }
-
-    showLoading('Menarik data gerbang...');
-
-    let dataGerbang = [];
-    try {
-      const resGerbang = await apiCall('laporan', 'absensiGerbang', { data: { jenis: 'harian', tanggal: tanggal } });
-      if (resGerbang.success && resGerbang.data) dataGerbang = resGerbang.data;
-    } catch (e) {
-      console.log("Info: Data gerbang tidak ditarik.");
-    }
-
-    hideLoading();
-
-    let tableHtml = `
-      <div class="card">
-        <h3>Validasi Absensi ${nKelas(kelasId)} - ${nMapel(mapelId)} (${formatTanggalIndo(tanggal)})</h3>
-        <div class="hint" style="margin-bottom:10px;">💡 Status <b>Hadir</b> otomatis terisi jika siswa sudah scan di gerbang. Guru cukup menyesuaikan jika ada siswa bolos.</div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Nama Siswa</th>
-                <th>Kelas</th>
-                <th>Info Gerbang</th>
-                <th>Status Kelas</th>
-                <th>Keterangan</th>
-              </tr>
-            </thead>
-            <tbody>`;
-
-    siswaList.forEach(siswa => {
-      const existing = DB.absensi.find(a => String(a.siswaId).trim() === String(siswa.id).trim() && String(a.mapelId).trim() === String(mapelId).trim() && String(a.tanggal).trim() === String(tanggal).trim());
-      
-      const nisSiswa = String(siswa.nis).trim();
-      const scan = dataGerbang.find(g => String(g.nis).trim() === nisSiswa);
-
-      let badgeGerbang = `<span class="badge b-red">Tidak Scan</span>`;
-      if (scan && scan.jamMasuk && scan.jamMasuk !== '-') {
-        let jamTampil = scan.jamMasuk;
-        if (String(jamTampil).includes('1899-12-30T')) {
-          jamTampil = String(jamTampil).split('T')[1].substring(0, 5);
-        } else if (String(jamTampil).includes('T')) {
-          jamTampil = new Date(jamTampil).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
-        }
-        badgeGerbang = `<span class="badge b-green">Hadir ${jamTampil}</span>`;
-      }
-
-      let defaultStatus = 'Alfa'; 
-      if (existing) {
-        defaultStatus = existing.status;
-      } else if (scan && scan.jamMasuk && scan.jamMasuk !== '-') {
-        defaultStatus = 'Hadir'; 
-      }
-
-      const ket = existing ? existing.keterangan : '';
-
-      tableHtml += `
-        <tr data-siswa="${siswa.id}" data-absen-id="${existing ? existing.id : ''}">
-          <td><b>${esc(siswa.nama)}</b><br><span style="font-size:.72rem;color:var(--muted);">${esc(siswa.nis)}</span></td>
-          <td><span class="badge b-blue">${esc(nKelas(siswa.kelasId))}</span></td>
-          <td>${badgeGerbang}</td>
-          <td>
-            <select class="inp-absen-status" style="width:100px;">
-              <option value="Hadir" ${defaultStatus==='Hadir'?'selected':''}>Hadir</option>
-              <option value="Sakit" ${defaultStatus==='Sakit'?'selected':''}>Sakit</option>
-              <option value="Izin" ${defaultStatus==='Izin'?'selected':''}>Izin</option>
-              <option value="Alfa" ${defaultStatus==='Alfa'?'selected':''}>Alfa</option>
-            </select>
-          </td>
-          <td><input type="text" class="inp-absen-ket" value="${esc(ket)}" placeholder="Opsional"></td>
-        </tr>`;
-    });
-
-    tableHtml += `
-            </tbody>
-          </table>
-        </div>
-        <div class="btn-row">
-          <button type="button" class="btn btn-success" onclick="simpanSemuaAbsensi('${mapelId}', '${tanggal}')">💾 Validasi & Simpan Absensi</button>        </div>
-      </div>`;
-
-    document.getElementById('tabelAbsensiContainer').innerHTML = tableHtml;
-
-  } catch (error) {
-    hideLoading();
-    console.error(error);
-    alert("❌ Gagal memuat tabel absensi: " + error.message);
-    document.getElementById('tabelAbsensiContainer').innerHTML = `<div class="card"><p style="color:red; text-align:center;">Error: ${error.message}</p></div>`;
-  }
-};
+    // ==========================================
+    // RENDER LAINNYA (KASUS, JURNAL, AGENDA)
+    // ==========================================
     function renderKasus() {
       const isGuru = CURRENT_USER.role.toLowerCase().includes('guru'); const waliInfo = getMyWaliKelasInfo();
       let myGuruId = null, filterMapelForm = DB.mapel, filterKelasForm = DB.kelas, kasusToShow = DB.kasus;
@@ -913,6 +980,9 @@ window.muatTabelAbsensi = async () => {
       return d.toLocaleDateString('id-ID', {day:'2-digit', month:'2-digit', year:'numeric'});
     }
 
+    // ==========================================
+    // CETAK PDF (ANTI POPUP)
+    // ==========================================
     window.cetakPDFKasus = () => {
       try {
         const isGuru = CURRENT_USER.role.toLowerCase().includes('guru'); const waliInfo = getMyWaliKelasInfo(); let kasusToPrint = DB.kasus;
@@ -986,110 +1056,6 @@ window.muatTabelAbsensi = async () => {
       } catch (e) { alert("Error cetak: " + e.message); }
     };
 
-window.simpanSemuaAbsensi = async (mapelId, tanggal) => {
-  try {
-    const rows = document.querySelectorAll('#tabelAbsensiContainer tbody tr');
-    if (rows.length === 0) return alert('Tidak ada data absensi untuk disimpan.');
-    
-    showLoading('Menyimpan...'); 
-    const payload = [];
-    
-    for (const tr of rows) {
-      const siswaId = tr.dataset.siswa;
-      const absenId = tr.dataset.absenId; // Kosong jika belum pernah disimpan
-      const status = tr.querySelector('.inp-absen-status').value;
-      const keterangan = tr.querySelector('.inp-absen-ket').value;
-      
-      payload.push({ 
-        id: absenId || '', // Kirim string kosong jika baru
-        siswaId, 
-        mapelId, 
-        tanggal, 
-        status, 
-        keterangan 
-      });
-    }
-
-    // Proses simpan ke backend (GAS)
-    const res = await apiCall('bulkSave', 'absensi', { data: payload });
-    toast('Absensi berhasil divalidasi & disimpan!');
-    
-    // Perbarui data di memori lokal
-    payload.forEach(item => {
-      const idx = DB.absensi.findIndex(x => x.id === item.id);
-      if (idx > -1) {
-        DB.absensi[idx] = { ...DB.absensi[idx], ...item };
-      } else {
-        // Karena ID baru dibuat oleh server, kita tidak tahu ID-nya di sini. 
-        // Solusi tercepat: tarik ulang data dari server.
-      }
-    });
-    
-    // Tarik ulang data terbaru dari server agar ID data baru (jika ada) sinkron
-    const allRes = await apiCall('getAllData');
-    DB = { ...DB, ...allRes.data };
-    
-    muatTabelAbsensi(); // Refresh tampilan tabel
-    
-  } catch (e) { 
-    console.error("Gagal simpan absensi:", e);
-    alert('❌ Gagal menyimpan absensi: ' + e.message); 
-  } finally { 
-    hideLoading(); 
-  }
-};
-    
-window.simpanSemuaNilai = async (mapelId, kelasId, semester) => {
-  try {
-    const rows = document.querySelectorAll('#tabelNilaiContainer tbody tr');
-    if (rows.length === 0) return alert('Tidak ada data untuk disimpan.');
-    
-    showLoading('Menyimpan...'); 
-    const payload = [];
-    
-    for (const tr of rows) {
-      const siswaId = tr.dataset.siswa, nilaiId = tr.dataset.nilaiId;
-      let harianArr = [], uts = 0, uas = 0;
-      tr.querySelectorAll('.inp-nilai').forEach(inp => {
-        if (inp.dataset.type === 'harian') harianArr.push(inp.value === '' ? 0 : Number(inp.value));
-        else if (inp.dataset.type === 'uts') uts = inp.value === '' ? 0 : Number(inp.value);
-        else if (inp.dataset.type === 'uas') uas = inp.value === '' ? 0 : Number(inp.value);
-      });
-      payload.push({ 
-        id: nilaiId || '', 
-        siswaId, 
-        mapelId, 
-        semester, 
-        tahunAjaran: TAHUN_AJARAN_AKTIF, 
-        harian: harianArr.join(','), 
-        uts, 
-        uas 
-      });
-    }
-
-    // Tembak API
-    const res = await apiCall('bulkSave', 'nilai', { data: payload });
-    toast('Nilai berhasil disimpan!');
-    
-    // Perbarui data di memori lokal tanpa fetch ulang agar cepat
-    payload.forEach(item => {
-      const idx = DB.nilai.findIndex(x => x.id === item.id);
-      if (idx > -1) {
-        DB.nilai[idx] = { ...DB.nilai[idx], ...item };
-      } else {
-        // Jika data baru, kita tidak tahu ID aslinya dari server, 
-        // tapi kita muat ulang tabel saja agar data terbaru ditarik
-      }
-    });
-    
-    muatTabelNilai(); // Refresh tampilan
-  } catch (e) { 
-    console.error("Gagal simpan nilai:", e);
-    alert('❌ Gagal menyimpan nilai: ' + e.message); 
-  } finally { 
-    hideLoading(); 
-  }
-};
     window.cetakRaporWaliKelas = () => {
       try {
         const waliInfo = getMyWaliKelasInfo();
