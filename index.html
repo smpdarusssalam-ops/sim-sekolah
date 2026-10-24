@@ -709,6 +709,18 @@
     document.getElementById('tabelNilaiContainer').innerHTML = `<div class="card"><p style="color:red; text-align:center;">Error: ${error.message}</p></div>`;
   }
 };
+window.hitungNilaiAkhirRow = (tr) => {
+  let totalHarian = 0, countHarian = 0, uts = 0, uas = 0;
+  tr.querySelectorAll('.inp-nilai').forEach(inp => {
+    const val = parseFloat(inp.value) || 0;
+    if (inp.dataset.type === 'harian') { totalHarian += val; countHarian++; }
+    else if (inp.dataset.type === 'uts') uts = val;
+    else if (inp.dataset.type === 'uas') uas = val;
+  });
+  const nilaiAkhir = Math.round((((countHarian > 0 ? totalHarian / countHarian : 0) + uts + uas) / 3) * 100) / 100;
+  tr.querySelector('.nilai-akhir-text').textContent = nilaiAkhir;
+};
+    
 window.muatTabelAbsensi = async () => {
   try {
     const mapelId = document.getElementById('inpAbsenMapel')?.value;
