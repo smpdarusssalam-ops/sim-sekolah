@@ -429,43 +429,109 @@ function getTandaTangan(role = 'guru', mapelId = null) {
     }
 
     function renderGuru() {
-      return `
-        <div class="card">
-          <h3>💼 Tambah Guru</h3>
-          <form onsubmit="submitForm(event, 'guru')">
-            <div class="form-grid">
-              <div class="field"><label>NUPTK / NIP</label><input name="nip" required></div>
-              <div class="field"><label>Nama Lengkap</label><input name="nama" required></div>
-              <div class="field"><label>Mapel yang Diampu</label>
-                <select name="mapelId" required>
-                  <option value="">-- Pilih Mapel --</option>
-                  ${DB.mapel.map(m => `<option value="${m.id}">${m.nama}</option>`).join('')}
-                </select>
-              </div>
-              <div class="field"><label>Status</label><select name="status"><option>PNS</option><option>PPPK</option><option>GTT</option><option>Honorer</option></select></div>
-            </div>
-            <div class="btn-row"><button class="btn btn-primary" type="submit">💾 Simpan Guru</button></div>
-          </form>
+  return `
+    <div class="card" id="formGuruCard">
+      <h3 id="formGuruTitle">💼 Tambah Guru</h3>
+      <form onsubmit="submitGuru(event)" id="formGuru">
+        <input type="hidden" name="id" id="guruId">
+        <div class="form-grid">
+          <div class="field"><label>NUPTK / NIP</label><input name="nip" id="guruNip" required></div>
+          <div class="field"><label>Nama Lengkap</label><input name="nama" id="guruNama" required></div>
+          <div class="field"><label>Mapel yang Diampu</label>
+            <select name="mapelId" id="guruMapel" required>
+              <option value="">-- Pilih Mapel --</option>
+              ${DB.mapel.map(m => `<option value="${m.id}">${m.nama}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field"><label>Status</label>
+            <select name="status" id="guruStatus">
+              <option>PNS</option><option>PPPK</option><option>GTT</option><option>Honorer</option>
+            </select>
+          </div>
         </div>
-        <div class="card">
-          <h3>📋 Daftar Guru & Pegawai (${DB.guru.length} Data)</h3>
-          <div class="table-wrap"><table><thead><tr><th>NUPTK</th><th>Nama</th><th>Mapel</th><th>Wali Kelas</th><th>Aksi</th></tr></thead>
-          <tbody>${DB.guru.map(g => {
-            const waliKelas = DB.kelas.find(k => k.waliKelasId === g.id);
-            return `<tr>
-              <td>${esc(g.nip)}</td>
-              <td>${esc(g.nama)}</td>
-              <td><b>${esc(nMapel(g.mapelId))}</b></td>
-              <td>${waliKelas ? `<span class="badge b-blue">${waliKelas.nama}</span>` : '-'}</td>
-              <td>
-                <button class="btn btn-primary btn-sm" onclick="editWaliKelas('${g.id}')">Set Wali Kelas</button>
-                <button class="btn btn-danger btn-sm" onclick="deleteData('guru','${g.id}')">Hapus</button>
-              </td>
-            </tr>`;
-          }).join('')}</tbody></table></div>
-        </div>`;
-    }
+        <div class="btn-row">
+          <button class="btn btn-primary" type="submit" id="btnSimpanGuru">💾 Simpan Guru</button>
+          <button class="btn btn-secondary" type="button" onclick="resetFormGuru()" id="btnBatalGuru" style="display:none;">Batal Edit</button>
+        </div>
+      </form>
+    </div>
+    <div class="card">
+      <h3>📋 Daftar Guru & Pegawai (${DB.guru.length} Data)</h3>
+      <div class="table-wrap"><table><thead><tr><th>NUPTK</th><th>Nama</th><th>Mapel</th><th>Wali Kelas</th><th>Aksi</th></tr></thead>
+      <tbody>${DB.guru.map(g => {
+        const waliKelas = DB.kelas.find(k => k.waliKelasId === g.id);
+        return `<tr>
+          <td>${esc(g.nip)}</td>
+          <td>${esc(g.nama)}</td>
+          <td><b>${esc(nMapel(g.mapelId))}</b></td>
+          <td>${waliKelas ? `<span class="badge b-blue">${waliKelas.nama}</span>` : '-'}</td>
+          <td>
+            <button class="btn btn-warning btn-sm" onclick="editGuru('${g.id}')">Edit</button>
+            <button class="btn btn-primary btn-sm" onclick="editWaliKelas('${g.id}')">Set Wali Kelas</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteData('guru','${g.id}')">Hapus</button>
+          </td>
+        </tr>`;
+      }).join('')}</tbody></table></div>
+    </div>`;
+}
+window.editGuru = (id) => {
+  const g = DB.guru.find(x => x.id === id);
+  if (!g) return;
+  
+  // Isi form dengan data guru yang dipilih
+  document.getElementById('guruId').value = g.id;
+  document.getElementById('guruNip').value = g.nip || '';
+  document.getElementById('guruNama').value = g.nama || '';
+  document.getElementById('guruMapel').value = g.mapelId || '';
+  document.getElementById('guruStatus').value = g.status || 'PNS';
+  
+  // Ubah tampilan form menjadi mode Edit
+  document.getElementById('formGuruTitle').innerText = '✏️ Edit Data Guru';
+  document.getElementById('btnSimpanGuru').innerText = '💾 Update Data';
+  document.getElementById('btnBatalGuru').style.display = 'inline-flex';
+  
+  // Scroll ke atas form
+  document.getElementById('formGuruCard').scrollIntoView({ behavior: 'smooth' });
+};
 
+window.resetFormGuru = () => {
+  document.getElementById('guruId').value = '';
+  document.getElementById('formGuru').reset();
+  document.getElementById('formGuruTitle').innerText = '💼 Tambah Guru';
+  document.getElementById('btnSimpanGuru').innerText = '💾 Simpan Guru';
+  document.getElementById('btnBatalGuru').style.display = 'none';
+};
+
+window.submitGuru = async (e) => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target).entries());
+  const id = data.id;
+  delete data.id;
+  
+  showLoading('Menyimpan...');
+  try {
+    if (id) {
+      // Proses Update
+      await apiCall('update', 'guru', { id: id, data: data });
+      const idx = DB.guru.findIndex(x => x.id === id);
+      if (idx > -1) DB.guru[idx] = { id, ...data };
+      toast('Data guru berhasil diupdate!');
+    } else {
+      // Proses Create (Tambah Baru)
+      const res = await apiCall('create', 'guru', { data: data });
+      DB.guru.push(res.data);
+      toast('Guru baru berhasil disimpan!');
+    }
+    resetFormGuru();
+    navigate('guru'); // Refresh tabel
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    hideLoading();
+  }
+};
+
+    
     window.editWaliKelas = async (guruId) => {
       const currentWali = DB.kelas.find(k => k.waliKelasId === guruId);
       const targetKelasId = prompt(`Pilih ID Kelas:\n(0 = Lepas Jabatan)\n\n${DB.kelas.map((k,i)=>`${i+1}. ${k.nama}`).join('\n')}`, currentWali ? (DB.kelas.findIndex(k => k.id === currentWali.id) + 1) : '0');
