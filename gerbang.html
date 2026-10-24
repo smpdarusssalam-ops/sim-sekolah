@@ -302,7 +302,7 @@
     // =====================================================
     // ⚠️ ISI URL WEB APP APPS SCRIPT DI SINI
     // =====================================================
-    const API_URL = "https://script.google.com/macros/s/AKfycbz0fwJLEkRD6tksUMn8xsvCtf9Tk3VbE7ZX8Uzeg4X5DD60TIk00vkwRQSs9VkgrecfdA/exec";
+    const API_URL = "URL_WEB_APP_ANDA_DI_SINI";
     
     if (API_URL.indexOf('URL_WEB_APP') !== -1) {
         document.getElementById('configWarning').style.display = 'block';
@@ -355,16 +355,15 @@
     }
     
     function formatTgl(tglStr) {
-    if (!tglStr) return '-';
-    const d = new Date(tglStr);
-    // Jika format tidak dikenali, kembalikan teks aslinya
-    if (isNaN(d.getTime())) return String(tglStr).slice(0,10); 
-    
-    const dd = String(d.getDate()).padStart(2, '0');
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const yyyy = d.getFullYear();
-    return `${dd}/${mm}/${yyyy}`;
-}
+        if (!tglStr) return '-';
+        const d = new Date(tglStr);
+        if (isNaN(d.getTime())) return String(tglStr).slice(0,10); 
+        
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const yyyy = d.getFullYear();
+        return `${dd}/${mm}/${yyyy}`;
+    }
     
     function escapeStr(s) {
         return (s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
@@ -411,21 +410,20 @@
         initSpeech();
     }
 
-    // Ganti fungsi ucapkanTerimaKasih dengan ini:
-function ucapkanTeks(teks) {
-    if (!('speechSynthesis' in window)) return;
-    try {
-        window.speechSynthesis.cancel();
-        initSpeech();
-        const utterance = new SpeechSynthesisUtterance(teks);
-        utterance.lang = 'id-ID';
-        utterance.rate = 1.0;
-        utterance.pitch = 1.1;
-        utterance.volume = 1.0;
-        if (suaraTersedia) utterance.voice = suaraTersedia;
-        window.speechSynthesis.speak(utterance);
-    } catch (e) { console.log('Error TTS:', e); }
-}
+    function ucapkanTeks(teks) {
+        if (!('speechSynthesis' in window)) return;
+        try {
+            window.speechSynthesis.cancel();
+            initSpeech();
+            const utterance = new SpeechSynthesisUtterance(teks);
+            utterance.lang = 'id-ID';
+            utterance.rate = 1.0;
+            utterance.pitch = 1.1;
+            utterance.volume = 1.0;
+            if (suaraTersedia) utterance.voice = suaraTersedia;
+            window.speechSynthesis.speak(utterance);
+        } catch (e) { console.log('Error TTS:', e); }
+    }
 
     document.addEventListener('click', function() {
         initAudio(); initSpeech();
@@ -601,75 +599,61 @@ function ucapkanTeks(teks) {
     });
 
     async function prosesAbsen(nis) {
-    const resultBox = document.getElementById('resultBox');
-    resultBox.className = 'result';
-    resultBox.style.display = 'block';
-    resultBox.innerHTML = '<p>⏳ Memproses...</p>';
-    
-    try {
-        const res = await apiPost({ action: 'absen', nis: nis });
+        const resultBox = document.getElementById('resultBox');
+        resultBox.className = 'result';
+        resultBox.style.display = 'block';
+        resultBox.innerHTML = '<p>⏳ Memproses...</p>';
         
-        if (res.success) {
-            const isMasuk = res.mode === 'masuk';
-            const namaDepan = (res.siswa.nama || '').split(' ')[0];
+        try {
+            const res = await apiPost({ action: 'absen', nis: nis });
+            
+            if (res.success) {
+                const isMasuk = res.mode === 'masuk';
+                const namaDepan = (res.siswa.nama || '').split(' ')[0];
 
-            // ==========================================
-            // JIKA SISWA SUDAH ABSEN (SCAN KEDUA KALI)
-            // ==========================================
-            if (res.duplicate) {
-                // Tampilan warna kuning/oranye
-                resultBox.className = 'result success-pulang'; // pakai style oranye
-                resultBox.innerHTML = 
-                    '<h2>⚠️ Sudah Absen</h2>' +
-                    '<div class="info-row"><span class="label">Nama</span><span class="value">' + res.siswa.nama + '</span></div>' +
-                    '<div class="info-row"><span class="label">Status</span><span class="value">' + res.message + '</span></div>' +
-                    '<div class="info-row"><span class="label">Jam ' + (isMasuk ? 'Masuk' : 'Pulang') + '</span><span class="value">' + formatJam(res.jam) + '</span></div>';
-                
-                // Bunyi peringatan (Beep rendah)
-                beep(400, 0.2); setTimeout(() => beep(400, 0.3), 200);
-                // Suara TTS peringatan
-                setTimeout(() => ucapkanTeks(`Anda sudah absen, ${namaDepan}`), 300);
-
-            } 
-            // ==========================================
-            // JIKA ABSEN BERHASIL (SCAN PERTAMA KALI)
-            // ==========================================
-            else {
-                resultBox.className = 'result ' + (isMasuk ? 'success-masuk' : 'success-pulang');
-                
-                if (isMasuk) {
-                    beep(1200, 0.1); setTimeout(() => beep(1600, 0.15), 120);
+                if (res.duplicate) {
+                    resultBox.className = 'result success-pulang';
+                    resultBox.innerHTML = 
+                        '<h2>⚠️ Sudah Absen</h2>' +
+                        '<div class="info-row"><span class="label">Nama</span><span class="value">' + res.siswa.nama + '</span></div>' +
+                        '<div class="info-row"><span class="label">Status</span><span class="value">' + res.message + '</span></div>' +
+                        '<div class="info-row"><span class="label">Jam ' + (isMasuk ? 'Masuk' : 'Pulang') + '</span><span class="value">' + formatJam(res.jam) + '</span></div>';
+                    beep(400, 0.2); setTimeout(() => beep(400, 0.3), 200);
+                    setTimeout(() => ucapkanTeks(`Anda sudah absen, ${namaDepan}`), 300);
                 } else {
-                    beep(900, 0.1); setTimeout(() => beep(1200, 0.15), 120);
+                    resultBox.className = 'result ' + (isMasuk ? 'success-masuk' : 'success-pulang');
+                    if (isMasuk) {
+                        beep(1200, 0.1); setTimeout(() => beep(1600, 0.15), 120);
+                    } else {
+                        beep(900, 0.1); setTimeout(() => beep(1200, 0.15), 120);
+                    }
+                    setTimeout(() => ucapkanTeks(`Terima kasih, ${namaDepan}`), 350);
+                    
+                    resultBox.innerHTML = 
+                        '<h2>' + (isMasuk ? '✅ Absen Masuk Berhasil' : '👋 Absen Pulang Berhasil') + '</h2>' +
+                        '<div class="info-row"><span class="label">Nama</span><span class="value">' + res.siswa.nama + '</span></div>' +
+                        '<div class="info-row"><span class="label">NIS</span><span class="value">' + res.siswa.nis + '</span></div>' +
+                        '<div class="info-row"><span class="label">Kelas</span><span class="value">' + res.siswa.kelas + '</span></div>' +
+                        '<div class="info-row"><span class="label">Jam ' + (isMasuk ? 'Masuk' : 'Pulang') + '</span><span class="value">' + formatJam(res.jam) + '</span></div>';
                 }
                 
-                // Suara TTS terima kasih
-                setTimeout(() => ucapkanTeks(`Terima kasih, ${namaDepan}`), 350);
-                
-                resultBox.innerHTML = 
-                    '<h2>' + (isMasuk ? '✅ Absen Masuk Berhasil' : '👋 Absen Pulang Berhasil') + '</h2>' +
-                    '<div class="info-row"><span class="label">Nama</span><span class="value">' + res.siswa.nama + '</span></div>' +
-                    '<div class="info-row"><span class="label">NIS</span><span class="value">' + res.siswa.nis + '</span></div>' +
-                    '<div class="info-row"><span class="label">Kelas</span><span class="value">' + res.siswa.kelas + '</span></div>' +
-                    '<div class="info-row"><span class="label">Jam ' + (isMasuk ? 'Masuk' : 'Pulang') + '</span><span class="value">' + formatJam(res.jam) + '</span></div>';
+                setTimeout(loadLiveFeed, 1000);
+                updateRekap();
+            } else {
+                beep(300, 0.4);
+                resultBox.className = 'result error';
+                resultBox.innerHTML = '<h2>❌ Gagal</h2><p>' + (res.message || res.error) + '</p>';
+                setTimeout(() => ucapkanTeks('Absen gagal'), 200);
             }
-            
-            setTimeout(loadLiveFeed, 1000);
-            updateRekap();
-        } else {
+        } catch (err) {
             beep(300, 0.4);
             resultBox.className = 'result error';
-            resultBox.innerHTML = '<h2>❌ Gagal</h2><p>' + (res.message || res.error) + '</p>';
-            setTimeout(() => ucapkanTeks('Absen gagal'), 200);
+            resultBox.innerHTML = '<h2>❌ Error</h2><p>' + err.message + '</p>';
         }
-    } catch (err) {
-        beep(300, 0.4);
-        resultBox.className = 'result error';
-        resultBox.innerHTML = '<h2>❌ Error</h2><p>' + err.message + '</p>';
+        
+        if (currentMode === 'rfid') rfidInput.focus();
     }
-    
-    if (currentMode === 'rfid') rfidInput.focus();
-}
+
     // =====================================================
     // ADMIN PANEL & LAPORAN
     // =====================================================
@@ -826,212 +810,163 @@ function ucapkanTeks(teks) {
         }
     }
 
-    // Ganti seluruh fungsi exportLaporan dengan ini
-async function exportLaporan(jenis, format) {
-    const info = document.getElementById('infoMsg');
-    info.style.display = 'none';
-    document.getElementById('loadingIndicator').style.display = 'block';
-    document.getElementById('loadingIndicator').innerText = 'Memproses data...';
-    
-    let params = { action: 'laporan', jenis: jenis };
-    if (jenis === 'harian') params.tanggal = document.getElementById('inputTanggal').value;
-    else if (jenis === 'bulanan') { params.bulan = document.getElementById('inputBulan').value; params.tahun = document.getElementById('inputTahunBulanan').value; }
-    else if (jenis === 'tahunan') params.tahun = document.getElementById('inputTahun').value;
-    
-    try {
-        const res = await apiGet(params);
-        document.getElementById('loadingIndicator').style.display = 'none';
-        document.getElementById('loadingIndicator').innerText = 'Memuat data...';
+    // =====================================================
+    // EXPORT LAPORAN (PDF & EXCEL)
+    // =====================================================
+    async function exportLaporan(jenis, format) {
+        const info = document.getElementById('infoMsg');
+        info.style.display = 'none';
+        document.getElementById('loadingIndicator').style.display = 'block';
+        document.getElementById('loadingIndicator').innerText = 'Memproses data...';
         
-        if (!res.success || !res.data || res.data.length === 0) {
-            info.className = 'info-msg err';
-            info.innerHTML = '❌ Gagal: Tidak ada data untuk periode ini.';
-            info.style.display = 'block';
-            return;
-        }
-
-        const data = res.data;
-
-        // === FORMAT EXCEL (CSV) ===
-        if (format === 'xlsx') {
-            let csvContent = "Tanggal,NIS,Nama,Kelas,Jam Masuk,Jam Pulang\n";
-            data.forEach(d => {
-                csvContent += `${d.tanggal},${d.nis},${d.nama},${d.kelas},${d.jamMasuk},${d.jamPulang}\n`;
-            });
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.setAttribute("href", url);
-            link.setAttribute("download", `Laporan_Gerbang_${jenis}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+        let params = { action: 'laporan', jenis: jenis };
+        if (jenis === 'harian') params.tanggal = document.getElementById('inputTanggal').value;
+        else if (jenis === 'bulanan') { params.bulan = document.getElementById('inputBulan').value; params.tahun = document.getElementById('inputTahunBulanan').value; }
+        else if (jenis === 'tahunan') params.tahun = document.getElementById('inputTahun').value;
+        
+        try {
+            const res = await apiGet(params);
+            document.getElementById('loadingIndicator').style.display = 'none';
+            document.getElementById('loadingIndicator').innerText = 'Memuat data...';
             
-            info.className = 'info-msg ok';
-            info.innerHTML = '✅ File Excel (CSV) berhasil diunduh.';
+            if (!res.success || !res.data || res.data.length === 0) {
+                info.className = 'info-msg err';
+                info.innerHTML = '❌ Gagal: Tidak ada data untuk periode ini.';
+                info.style.display = 'block';
+                return;
+            }
+
+            const data = res.data;
+
+            // === EXCEL (CSV) ===
+            if (format === 'xlsx') {
+                let csvContent = "Tanggal,NIS,Nama,Kelas,Jam Masuk,Jam Pulang\n";
+                data.forEach(d => {
+                    csvContent += `${d.tanggal},${d.nis},${d.nama},${d.kelas},${d.jamMasuk},${d.jamPulang}\n`;
+                });
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.setAttribute("href", url);
+                link.setAttribute("download", `Laporan_Gerbang_${jenis}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                info.className = 'info-msg ok';
+                info.innerHTML = '✅ File Excel (CSV) berhasil diunduh.';
+                info.style.display = 'block';
+                return;
+            }
+
+            // === PDF (DENGAN KOP SURAT & TTD) ===
+            let rowsHtml = data.map((d, i) => `
+                <tr>
+                    <td style="text-align:center;">${i+1}</td>
+                    <td>${formatTgl(d.tanggal)}</td>
+                    <td>${d.nis}</td>
+                    <td>${d.nama}</td>
+                    <td>${d.kelas}</td>
+                    <td style="text-align:center;">${formatJam(d.jamMasuk)}</td>
+                    <td style="text-align:center;">${formatJam(d.jamPulang)}</td>
+                </tr>
+            `).join('');
+
+            let periodeTeks = jenis === 'harian' ? formatTgl(params.tanggal) : (jenis === 'bulanan' ? `${params.bulan}/${params.tahun}` : params.tahun);
+            
+            const now = new Date();
+            const tglTtd = now.toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'});
+
+            let kopSurat = `
+                <div style="display:flex; align-items:center; border-bottom:3px solid #000; padding-bottom:10px; margin-bottom:20px;">
+                    <div style="width:100px; text-align:center;">
+                        <img src="https://via.placeholder.com/80" style="max-width:80px; max-height:80px; border-radius:50%;">
+                    </div>
+                    <div style="flex:1; text-align:center; padding:0 10px;">
+                        <div style="font-size:14px; font-weight:bold;">YAYASAN PENDIDIKAN DARUSSALAM</div>
+                        <div style="font-size:20px; font-weight:bold; margin:2px 0;">SMP DARUSSALAM</div>
+                        <div style="font-size:11px;">Akreditasi A</div>
+                        <div style="font-size:11px;">Jl. Raya Sekolah No. 1, Garut</div>
+                        <div style="font-size:11px;">Telp: 0262-xxxx | Email: info@sekolah.sch.id</div>
+                    </div>
+                </div>
+            `;
+
+            let ttdHtml = `
+                <div style="display:flex; justify-content:space-between; margin-top:40px; font-size:13px;">
+                    <div style="text-align:center; width:45%;">
+                        <p>Mengetahui,</p>
+                        <p>Kepala Sekolah</p>
+                        <br><br><br><br>
+                        <p style="font-weight:bold; text-decoration:underline;">Drs. H. Ahmad, M.Pd</p>
+                        <p>NRKS: 123456789</p>
+                    </div>
+                    <div style="text-align:center; width:45%;">
+                        <p>Garut, ${tglTtd}</p>
+                        <p>Admin Gerbang</p>
+                        <br><br><br><br>
+                        <p style="font-weight:bold; text-decoration:underline;">Petugas Gerbang</p>
+                        <p>NIP: -</p>
+                    </div>
+                </div>
+            `;
+
+            let htmlPrint = `
+                <html><head><title>Cetak Laporan</title>
+                <style>
+                    body { font-family: 'Times New Roman', Times, serif; padding: 20px; font-size: 12px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                    th, td { border: 1px solid #000; padding: 8px; }
+                    th { background: #eee; text-align: left; }
+                    h3 { text-align: center; text-decoration: underline; margin-bottom: 5px; font-size: 16px; }
+                    p { text-align: center; margin-bottom: 20px; }
+                </style></head>
+                <body>
+                    ${kopSurat}
+                    <h3>LAPORAN ABSENSI GERBANG</h3>
+                    <p>Periode: ${periodeTeks}</p>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>No</th><th>Tanggal</th><th>NIS</th><th>Nama</th><th>Kelas</th><th>Masuk</th><th>Pulang</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rowsHtml}</tbody>
+                    </table>
+                    ${ttdHtml}
+                </body></html>
+            `;
+
+            printHTMLLaporan(htmlPrint);
+            
+        } catch (err) {
+            document.getElementById('loadingIndicator').style.display = 'none';
+            info.className = 'info-msg err';
+            info.innerHTML = '❌ Error: ' + err.message;
             info.style.display = 'block';
-            return;
         }
-
-        // === FORMAT PDF (DENGAN KOP SURAT & TTD) ===
-        let rowsHtml = data.map((d, i) => `
-            <tr>
-                <td style="text-align:center;">${i+1}</td>
-                <td>${formatTgl(d.tanggal)}</td>
-                <td>${d.nis}</td>
-                <td>${d.nama}</td>
-                <td>${d.kelas}</td>
-                <td style="text-align:center;">${formatJam(d.jamMasuk)}</td>
-                <td style="text-align:center;">${formatJam(d.jamPulang)}</td>
-            </tr>
-        `).join('');
-
-        let periodeTeks = jenis === 'harian' ? formatTgl(params.tanggal) : (jenis === 'bulanan' ? `${params.bulan}/${params.tahun}` : params.tahun);
-        
-        // Tanggal hari ini untuk TTD
-        const now = new Date();
-        const tglTtd = now.toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'});
-
-        // Desain Kop Surat & Tanda Tangan
-        let kopSurat = `
-            <div style="display:flex; align-items:center; border-bottom:3px solid #000; padding-bottom:10px; margin-bottom:20px;">
-                <div style="width:100px; text-align:center;">
-                    <img src="https://via.placeholder.com/80" style="max-width:80px; max-height:80px; border-radius:50%;">
-                </div>
-                <div style="flex:1; text-align:center; padding:0 10px;">
-                    <div style="font-size:14px; font-weight:bold;">YAYASAN PENDIDIKAN DARUSSALAM</div>
-                    <div style="font-size:20px; font-weight:bold; margin:2px 0;">SMP DARUSSALAM</div>
-                    <div style="font-size:11px;">Akreditasi A</div>
-                    <div style="font-size:11px;">Jl. Raya Sekolah No. 1, Garut</div>
-                    <div style="font-size:11px;">Telp: 0262-xxxx | Email: info@sekolah.sch.id</div>
-                </div>
-            </div>
-        `;
-
-        let ttdHtml = `
-            <div style="display:flex; justify-content:space-between; margin-top:40px; font-size:13px;">
-                <div style="text-align:center; width:45%;">
-                    <p>Mengetahui,</p>
-                    <p>Kepala Sekolah</p>
-                    <br><br><br><br>
-                    <p style="font-weight:bold; text-decoration:underline;">Drs. H. Ahmad, M.Pd</p>
-                    <p>NRKS: 123456789</p>
-                </div>
-                <div style="text-align:center; width:45%;">
-                    <p>Garut, ${tglTtd}</p>
-                    <p>Admin Gerbang</p>
-                    <br><br><br><br>
-                    <p style="font-weight:bold; text-decoration:underline;">Petugas Gerbang</p>
-                    <p>NIP: -</p>
-                </div>
-            </div>
-        `;
-
-        let htmlPrint = `
-            <html><head><title>Cetak Laporan</title>
-            <style>
-                body { font-family: 'Times New Roman', Times, serif; padding: 20px; font-size: 12px; }
-                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                th, td { border: 1px solid #000; padding: 8px; }
-                th { background: #eee; text-align: left; }
-                h3 { text-align: center; text-decoration: underline; margin-bottom: 5px; font-size: 16px; }
-                p { text-align: center; margin-bottom: 20px; }
-            </style></head>
-            <body>
-                ${kopSurat}
-                <h3>LAPORAN ABSENSI GERBANG</h3>
-                <p>Periode: ${periodeTeks}</p>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>No</th><th>Tanggal</th><th>NIS</th><th>Nama</th><th>Kelas</th><th>Masuk</th><th>Pulang</th>
-                        </tr>
-                    </thead>
-                    <tbody>${rowsHtml}</tbody>
-                </table>
-                ${ttdHtml}
-            </body></html>
-        `;
-
-        printHTMLLaporan(htmlPrint);
-        
-    } catch (err) {
-        document.getElementById('loadingIndicator').style.display = 'none';
-        info.className = 'info-msg err';
-        info.innerHTML = '❌ Error: ' + err.message;
-        info.style.display = 'block';
     }
-}
-        // 3. Jika format PDF (Cetak Langsung via Iframe)
-        let rowsHtml = data.map((d, i) => `
-            <tr>
-                <td style="text-align:center;">${i+1}</td>
-                <td>${formatTgl(d.tanggal)}</td>
-                <td>${d.nis}</td>
-                <td>${d.nama}</td>
-                <td>${d.kelas}</td>
-                <td style="text-align:center;">${formatJam(d.jamMasuk)}</td>
-                <td style="text-align:center;">${formatJam(d.jamPulang)}</td>
-            </tr>
-        `).join('');
 
-        let periodeTeks = jenis === 'harian' ? formatTgl(params.tanggal) : (jenis === 'bulanan' ? `${params.bulan}/${params.tahun}` : params.tahun);
+    function printHTMLLaporan(html) {
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.width = '0px';
+        iframe.style.height = '0px';
+        iframe.style.border = 'none';
+        document.body.appendChild(iframe);
         
-        let htmlPrint = `
-            <html><head><title>Cetak Laporan</title>
-            <style>
-                body { font-family: sans-serif; padding: 20px; font-size: 12px; }
-                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                th, td { border: 1px solid #000; padding: 8px; }
-                th { background: #eee; }
-                h3 { text-align: center; text-decoration: underline; margin-bottom: 5px; }
-                p { text-align: center; margin-bottom: 20px; }
-            </style></head>
-            <body>
-                <h3>LAPORAN ABSENSI GERBANG</h3>
-                <p>Periode: ${periodeTeks}</p>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>No</th><th>Tanggal</th><th>NIS</th><th>Nama</th><th>Kelas</th><th>Masuk</th><th>Pulang</th>
-                        </tr>
-                    </thead>
-                    <tbody>${rowsHtml}</tbody>
-                </table>
-            </body></html>
-        `;
-
-        // Panggil fungsi cetak
-        printHTMLLaporan(htmlPrint);
+        const doc = iframe.contentWindow.document;
+        doc.open();
+        doc.write(html);
+        doc.close();
         
-    } catch (err) {
-        document.getElementById('loadingIndicator').style.display = 'none';
-        info.className = 'info-msg err';
-        info.innerHTML = '❌ Error: ' + err.message;
-        info.style.display = 'block';
+        setTimeout(() => {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+            setTimeout(() => document.body.removeChild(iframe), 1000);
+        }, 500);
     }
-}
 
-// Tambahkan fungsi bantuan ini di bawah exportLaporan (untuk mencetak tanpa popup blocker)
-function printHTMLLaporan(html) {
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.width = '0px';
-    iframe.style.height = '0px';
-    iframe.style.border = 'none';
-    document.body.appendChild(iframe);
-    
-    const doc = iframe.contentWindow.document;
-    doc.open();
-    doc.write(html);
-    doc.close();
-    
-    setTimeout(() => {
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-        setTimeout(() => document.body.removeChild(iframe), 1000);
-    }, 500);
-}
     // =====================================================
     // QR CODE GENERATOR
     // =====================================================
@@ -1177,46 +1112,44 @@ function printHTMLLaporan(html) {
     }
 
     function printSelectedQR() {
-    const nisArr = Object.keys(qrSelectedSet);
-    if (nisArr.length === 0) return alert('Pilih minimal 1 siswa terlebih dahulu.');
-    
-    const win = window.open('', '_blank');
-    if (!win) return alert('⚠️ Pop-up diblokir browser! Harap izinkan pop-up untuk situs ini.');
+        const nisArr = Object.keys(qrSelectedSet);
+        if (nisArr.length === 0) return alert('Pilih minimal 1 siswa terlebih dahulu.');
+        
+        const win = window.open('', '_blank');
+        if (!win) return alert('⚠️ Pop-up diblokir browser! Harap izinkan pop-up untuk situs ini.');
 
-    let html = '<!DOCTYPE html><html><head><title>Cetak Kartu QR</title><style>' +
-        'body{font-family:Arial;padding:10px;margin:0;}' +
-        '.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}' +
-        '.card{padding:8px;border:2px dashed #8e44ad;border-radius:8px;text-align:center;page-break-inside:avoid;}' +
-        '.card img{width:100%;max-width:160px;height:auto;}' +
-        '.nama{font-size:11px;font-weight:bold;margin:4px 0 2px;line-height:1.2;}' +
-        '.nis{font-family:monospace;font-size:10px;color:#666;}' +
-        '.kelas{font-size:9px;color:#8e44ad;font-weight:bold;}' +
-        '.header-title{text-align:center;margin-bottom:15px;font-size:14px;font-weight:bold;}' +
-        '@media print{@page{margin:8mm;size:A4;}}' +
-        '</style></head><body>' +
-        '<div class="header-title">KARTU ABSENSI SISWA - QR CODE</div><div class="grid">';
-    
-    nisArr.forEach(nis => {
-        const siswa = qrStudentsList.find(s => s.nis === nis);
-        if (!siswa) return;
-        // Hapus crossorigin="anonymous" agar tidak diblokir
-        const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(nis) + '&margin=10';
-        html += '<div class="card"><img src="' + qrUrl + '">' +
-            '<div class="nama">' + siswa.nama + '</div><div class="nis">' + siswa.nis + '</div><div class="kelas">' + siswa.kelas + '</div></div>';
-    });
-    
-    // TAMBAHAN: Script di dalam iframe/window untuk menunggu semua gambar selesai dimuat
-    html += '</div>' +
-        '<script>' +
-        'window.addEventListener("load", function() {' +
-        '  setTimeout(function(){ window.print(); }, 500);' + // Tunggu setengah detik setelah gambar terakhir dimuat
-        '});' +
-        '<\/script>' +
-        '</body></html>';
+        let html = '<!DOCTYPE html><html><head><title>Cetak Kartu QR</title><style>' +
+            'body{font-family:Arial;padding:10px;margin:0;}' +
+            '.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}' +
+            '.card{padding:8px;border:2px dashed #8e44ad;border-radius:8px;text-align:center;page-break-inside:avoid;}' +
+            '.card img{width:100%;max-width:160px;height:auto;}' +
+            '.nama{font-size:11px;font-weight:bold;margin:4px 0 2px;line-height:1.2;}' +
+            '.nis{font-family:monospace;font-size:10px;color:#666;}' +
+            '.kelas{font-size:9px;color:#8e44ad;font-weight:bold;}' +
+            '.header-title{text-align:center;margin-bottom:15px;font-size:14px;font-weight:bold;}' +
+            '@media print{@page{margin:8mm;size:A4;}}' +
+            '</style></head><body>' +
+            '<div class="header-title">KARTU ABSENSI SISWA - QR CODE</div><div class="grid">';
+        
+        nisArr.forEach(nis => {
+            const siswa = qrStudentsList.find(s => s.nis === nis);
+            if (!siswa) return;
+            const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(nis) + '&margin=10';
+            html += '<div class="card"><img src="' + qrUrl + '">' +
+                '<div class="nama">' + siswa.nama + '</div><div class="nis">' + siswa.nis + '</div><div class="kelas">' + siswa.kelas + '</div></div>';
+        });
+        
+        html += '</div>' +
+            '<script>' +
+            'window.addEventListener("load", function() {' +
+            '  setTimeout(function(){ window.print(); }, 500);' +
+            '});' +
+            '<\/script>' +
+            '</body></html>';
 
-    win.document.write(html);
-    win.document.close();
-}
+        win.document.write(html);
+        win.document.close();
+    }
 </script>
 </body>
 </html>
