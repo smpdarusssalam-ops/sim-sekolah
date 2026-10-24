@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SIM SMP Darussalam Tarogong Keler</title>
+  <title>SIM SMP Darussalam</title>
   <style>
     :root {
       --primary: #2563eb; --primary-dark: #1d4ed8; --bg: #f1f5f9;
@@ -32,9 +32,11 @@
 
     .app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
     .sidebar { background: var(--sidebar); padding: 20px 0; overflow-y: auto; position: sticky; top: 0; height: 100vh; }
+    
     .brand { display: flex; align-items: center; gap: 10px; padding: 0 20px 20px; border-bottom: 1px solid #1e293b; margin-bottom: 16px; }
     .brand .name { color: #fff; font-weight: 700; }
     .brand .sub { font-size: .7rem; color: #94a3b8; }
+    
     .nav-section { font-size: .68rem; text-transform: uppercase; color: #475569; padding: 12px 20px 6px; font-weight: 700; }
     .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 20px; cursor: pointer; font-size: .88rem; color: #94a3b8; border-left: 3px solid transparent; transition: .15s; }
     .nav-item:hover, .nav-item.active { background: #1e293b; color: #fff; border-left-color: var(--primary); }
@@ -105,9 +107,10 @@
   <div class="app" id="app" style="display:none;">
     <aside class="sidebar" id="sidebar">
       <div class="brand">
-  <img src="https://lh3.googleusercontent.com/d/1Q_M3uyUOiwcnE8pcTHBGwPPCBIWV28rO" style="width:35px; height:35px; border-radius:50%; object-fit:cover;">
-  <div><div class="name">SIM SEKOLAH</div><div class="sub">Darussalam Tarogong Keler</div></div>
-</div>
+        <img id="sidebarLogoImg" src="" style="width:35px; height:35px; border-radius:50%; object-fit:cover; display:none;">
+        <div id="sidebarLogoEmoji" style="font-size:1.6rem;">🏫</div>
+        <div><div class="name">SIM SEKOLAH</div><div class="sub">Darussalam</div></div>
+      </div>
       
       <div class="nav-section">Menu Utama</div>
       <div class="nav-item active" data-route="dashboard" onclick="navigate('dashboard')">📊 Dashboard</div>
@@ -149,17 +152,14 @@
   <div id="toast" class="toast"></div>
 
   <script>
-    // ==========================================
-    // ⚠️ KONFIGURASI: MASUKKAN URL WEB APP ANDA
-    // ==========================================
     const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz0fwJLEkRD6tksUMn8xsvCtf9Tk3VbE7ZX8Uzeg4X5DD60TIk00vkwRQSs9VkgrecfdA/exec'; 
 
     let CURRENT_USER = null;
-    let TAHUN_AJARAN_AKTIF = '2026/2027';
+    let TAHUN_AJARAN_AKTIF = '2024/2025';
     let DB = { pengaturan: [], siswa: [], guru: [], kelas: [], mapel: [], jadwal: [], nilai: [], absensi: [], kasus: [], jurnal: [], agenda: [], audit: [] };
     let currentSubTab = 'kelas';
     let subTabAbsensi = 'input';
-    let editJadwalId = null; // <--- TAMBAHKAN BARIS INI
+    let editJadwalId = null;
     
     const $ = (s) => document.querySelector(s);
     const esc = (s='') => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -183,107 +183,66 @@
     function showLoading(m = 'Memuat...') { $('#loadingText').textContent = m; $('#loadingOverlay').classList.add('show'); }
     function hideLoading() { $('#loadingOverlay').classList.remove('show'); }
 
-    // ==========================================
-    // FUNGSI CETAK (ANTI POP-UP BLOCKER)
-    // ==========================================
     function printHTML(html) {
       const iframe = document.createElement('iframe');
-      iframe.style.position = 'fixed';
-      iframe.style.width = '0px';
-      iframe.style.height = '0px';
-      iframe.style.border = 'none';
+      iframe.style.position = 'fixed'; iframe.style.width = '0px'; iframe.style.height = '0px'; iframe.style.border = 'none';
       document.body.appendChild(iframe);
-      
       const doc = iframe.contentWindow.document;
-      doc.open();
-      doc.write(html);
-      doc.close();
-      
-      // Beri waktu sebentar agar HTML ter-render sebelum print
+      doc.open(); doc.write(html); doc.close();
       setTimeout(() => {
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-        // Hapus iframe setelah selesai (opsional, tapi disarankan)
+        iframe.contentWindow.focus(); iframe.contentWindow.print();
         setTimeout(() => document.body.removeChild(iframe), 1000);
       }, 500);
     }
 
-    // ==========================================
-    // API CALL
-    // ==========================================
     function apiCall(action, entity, payload = {}) {
       return new Promise((resolve, reject) => {
         const body = { action, entity, user: CURRENT_USER?.nama || 'system', ...payload };
-        
-        if (!WEB_APP_URL || !WEB_APP_URL.includes('script.google.com')) {
-          return reject(new Error('URL Web App belum diisi.'));
-        }
-
+        if (!WEB_APP_URL || !WEB_APP_URL.includes('script.google.com')) return reject(new Error('URL Web App belum diisi.'));
         fetch(WEB_APP_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(body)
+          method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body)
         })
-        .then(res => res.text())
-        .then(text => {
+        .then(res => res.text()).then(text => {
           try {
             const res = JSON.parse(text);
-            if (!res) return reject(new Error('Response kosong dari server.'));
+            if (!res) return reject(new Error('Response kosong.'));
             if (res.ok === false || res.success === false) return reject(new Error(res.error || res.message));
             resolve(res);
-          } catch (e) {
-            console.error("Server Error Response:", text);
-            reject(new Error('Gagal terhubung ke server. Pastikan Deploy Web App versi terbaru & Access: Anyone.'));
-          }
-        })
-        .catch(err => reject(new Error('Gagal Fetch: ' + err.message)));
+          } catch (e) { console.error("Response Error:", text); reject(new Error('Gagal terhubung ke server.')); }
+        }).catch(err => reject(new Error('Gagal Fetch: ' + err.message)));
       });
     }
 
-    // ==========================================
-    // LOGIN & LOGOUT
-    // ==========================================
     async function doLogin() {
-      const u = $('#loginName').value.trim();
-      const p = $('#loginPassword').value;
-      const btn = $('#btnLogin');
+      const u = $('#loginName').value.trim(), p = $('#loginPassword').value, btn = $('#btnLogin');
       if (!u || !p) return toast('Isi username & password!', 'error');
-      
       btn.disabled = true; btn.textContent = 'Memverifikasi...'; showLoading('Autentikasi...');
       try {
         const res = await apiCall('login', 'users', { data: { username: u, password: p } });
         CURRENT_USER = { username: res.data.username, role: res.data.role, nama: res.data.nama };
-        
         if (res.data.db) DB = { ...DB, ...res.data.db };
-        else { 
-          const all = await apiCall('getAllData'); 
-          DB = { ...DB, ...all.data }; 
-        }
+        else { const all = await apiCall('getAllData'); DB = { ...DB, ...all.data }; }
         
         const taDb = DB.pengaturan.find(p => p.key === 'tahunAjaranAktif');
         if (taDb) TAHUN_AJARAN_AKTIF = taDb.value;
         
-        hideLoading();
-        $('#loginScreen').style.display = 'none';
-        $('#app').style.display = 'grid';
-        
-        $('#userName').textContent = CURRENT_USER.nama;
-        $('#userRole').textContent = CURRENT_USER.role;
-        $('#avatar').textContent = CURRENT_USER.nama[0].toUpperCase();
-        
-        if (CURRENT_USER.role.toLowerCase().includes('admin')) {
-          document.getElementById('menuAdminData').style.display = 'block';
-        } else {
-          document.getElementById('menuAdminData').style.display = 'none';
+        const logoUrl = getVal('logo', '');
+        if (logoUrl) {
+          const imgEl = document.getElementById('sidebarLogoImg'), emojiEl = document.getElementById('sidebarLogoEmoji');
+          if (imgEl && emojiEl) {
+            imgEl.src = logoUrl; imgEl.style.display = 'block'; emojiEl.style.display = 'none';
+            imgEl.onerror = function() { this.style.display = 'none'; emojiEl.style.display = 'block'; };
+          }
         }
         
-        navigate('dashboard');
-        toast(`Selamat datang, ${CURRENT_USER.nama}`);
-      } catch (e) {
-        hideLoading(); alert(`❌ GAGAL LOGIN\n\n${e.message}`);
-      } finally {
-        btn.disabled = false; btn.textContent = '🔐 Masuk';
-      }
+        hideLoading(); $('#loginScreen').style.display = 'none'; $('#app').style.display = 'grid';
+        $('#userName').textContent = CURRENT_USER.nama; $('#userRole').textContent = CURRENT_USER.role; $('#avatar').textContent = CURRENT_USER.nama[0].toUpperCase();
+        
+        if (CURRENT_USER.role.toLowerCase().includes('admin')) document.getElementById('menuAdminData').style.display = 'block';
+        else document.getElementById('menuAdminData').style.display = 'none';
+        
+        navigate('dashboard'); toast(`Selamat datang, ${CURRENT_USER.nama}`);
+      } catch (e) { hideLoading(); alert(`❌ GAGAL LOGIN\n\n${e.message}`); } finally { btn.disabled = false; btn.textContent = '🔐 Masuk'; }
     }
 
     function doLogout() {
@@ -291,9 +250,6 @@
       CURRENT_USER = null; $('#app').style.display = 'none'; $('#loginScreen').style.display = 'flex'; $('#loginPassword').value = '';
     }
 
-    // ==========================================
-    // NAVIGASI & HELPER
-    // ==========================================
     function getMyWaliKelasInfo() {
       if (!CURRENT_USER || !CURRENT_USER.nama) return null;
       const myGuru = DB.guru.find(g => g.nama && g.nama.trim().toLowerCase() === CURRENT_USER.nama.trim().toLowerCase());
@@ -307,7 +263,6 @@
       document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.route === route));
       const titles = { dashboard: 'Dashboard', siswa: 'Data Siswa', guru: 'Guru & Pegawai', akademik: 'Akademik', administrasi: 'Administrasi & Laporan', kasus: 'Catatan Kasus', jurnal: 'Jurnal', agenda: 'Agenda Sekolah' };
       $('#pageTitle').textContent = titles[route];
-      
       const map = { dashboard: renderDashboard, siswa: renderSiswa, guru: renderGuru, akademik: renderAkademik, administrasi: renderAdmin, kasus: renderKasus, jurnal: renderJurnal, agenda: renderAgenda };
       $('#content').innerHTML = map[route]();
       $('#sidebar').classList.remove('open');
@@ -316,84 +271,54 @@
 
     function getVal(key, def) { return DB.pengaturan.find(p => p.key === key)?.value || def; }
 
-   function getKopSurat() {
-  const logoUrl = getVal('logo', '');
-  // Tampilan jika logo belum diisi atau gagal dimuat
-  let logoHtml = logoUrl 
-    ? `<img src="${logoUrl}" style="max-width:85px; max-height:85px; object-fit:contain;">` 
-    : `<div style="width:85px; height:85px; background:#eee; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:32px;">🏫</div>`;
+    // ==========================================
+    // DESAIN KOP SURAT & TTD
+    // ==========================================
+    function getKopSurat() {
+      const logoUrl = getVal('logo', '');
+      let logoHtml = logoUrl ? `<img src="${logoUrl}" style="max-width:85px; max-height:85px; object-fit:contain;">` : `<div style="width:85px; height:85px; background:#eee; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:32px;">🏫</div>`;
+      return `
+        <div style="display:flex; align-items:center; margin-bottom:5px;">
+          <div style="width:100px; text-align:center;">${logoHtml}</div>
+          <div style="flex:1; text-align:center; padding:0 10px; line-height:1.3;">
+            <div style="font-size:15px; font-weight:bold; font-family:'Times New Roman', Times, serif;">${getVal('namaYayasan', 'YAYASAN PENDIDIKAN')}</div>
+            <div style="font-size:22px; font-weight:bold; letter-spacing:1px; font-family:'Times New Roman', Times, serif;">${getVal('namaSekolah', 'NAMA SEKOLAH')}</div>
+            <div style="font-size:12px; font-weight:bold;">${getVal('akreditasi', '')}</div>
+            <div style="font-size:11px;">${getVal('alamat', 'Jl. Raya Sekolah No. 1')}</div>
+            <div style="font-size:11px;">${getVal('kontak', 'Telp: 0262-xxxx | Email: info@sekolah.sch.id')}</div>
+          </div>
+          <div style="width:100px;"></div>
+        </div>
+        <div style="border-bottom: 3px solid #000; margin-bottom: 2px;"></div>
+        <div style="border-bottom: 1px solid #000; margin-bottom: 20px;"></div>
+      `;
+    }
 
-  return `
-    <div style="display:flex; align-items:center; margin-bottom:5px;">
-      <div style="width:100px; text-align:center;">${logoHtml}</div>
-      <div style="flex:1; text-align:center; padding:0 10px; line-height:1.3;">
-        <div style="font-size:15px; font-weight:bold; font-family:'Times New Roman', Times, serif;">${getVal('namaYayasan', 'YAYASAN PENDIDIKAN')}</div>
-        <div style="font-size:22px; font-weight:bold; letter-spacing:1px; font-family:'Times New Roman', Times, serif;">${getVal('namaSekolah', 'NAMA SEKOLAH')}</div>
-        <div style="font-size:12px; font-weight:bold;">TERAKREDITASI ${getVal('akreditasi', 'A')}</div>
-        <div style="font-size:11px;">${getVal('alamat', 'Jl. Raya Sekolah No. 1')}</div>
-        <div style="font-size:11px;">${getVal('kontak', 'Telp: 0262-xxxx | Email: info@sekolah.sch.id')}</div>
-      </div>
-      <div style="width:100px;"></div>
-    </div>
-    <div style="border-bottom: 3px solid #000; margin-bottom: 2px;"></div>
-    <div style="border-bottom: 1px solid #000; margin-bottom: 20px;"></div>
-  `;
-}
+    function getTandaTangan(role = 'guru', mapelId = null) {
+      let ttdKiri = '', ttdKanan = '';
+      const tgl = new Date().toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'});
+      const kepsek = getVal('kepsek', '..............................');
+      const nrks = getVal('nrksKepsek', getVal('nipKepsek', '-'));
+      let guruName = CURRENT_USER.nama, jabatanKanan = 'Guru Mata Pelajaran', nuptk = '-';
+      const myGuru = DB.guru.find(g => g.nama && g.nama.trim().toLowerCase() === CURRENT_USER.nama.trim().toLowerCase());
+      if (myGuru) { guruName = myGuru.nama; nuptk = myGuru.nip || '-'; }
+      if (role === 'guru' && mapelId) {
+        const mapelGuru = DB.guru.find(g => g.mapelId === mapelId);
+        if (mapelGuru) { guruName = mapelGuru.nama; nuptk = mapelGuru.nip || '-'; }
+      }
+      if (role === 'wali') { jabatanKanan = 'Wali Kelas'; } 
+      else if (role === 'kepsek' || CURRENT_USER.role.toLowerCase().includes('kepsek')) { jabatanKanan = 'Kepala Sekolah'; guruName = kepsek; nuptk = nrks; }
+      ttdKiri = `<div style="text-align:center; width:45%;"><p>Mengetahui,</p><p>Kepala Sekolah</p><div style="height: 60px;"></div><p style="font-weight:bold; text-decoration:underline; margin-bottom: 2px;">${kepsek}</p><p style="margin-top: 0;">NRKS: ${nrks}</p></div>`;
+      ttdKanan = `<div style="text-align:center; width:45%;"><p>Garut, ${tgl}</p><p>${jabatanKanan}</p><div style="height: 60px;"></div><p style="font-weight:bold; text-decoration:underline; margin-bottom: 2px;">${guruName}</p><p style="margin-top: 0;">NUPTK: ${nuptk}</p></div>`;
+      return `<div style="display:flex; justify-content:space-between; margin-top:30px;">${ttdKiri}${ttdKanan}</div>`;
+    }
 
-function getTandaTangan(role = 'guru', mapelId = null) {
-  let ttdKiri = '', ttdKanan = '';
-  const tgl = new Date().toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'});
-  const kepsek = getVal('kepsek', '..............................');
-  const nrks = getVal('nrksKepsek', getVal('nipKepsek', '-'));
-
-  let guruName = CURRENT_USER.nama;
-  let jabatanKanan = 'Guru Mata Pelajaran';
-  let nuptk = '-';
-
-  // Ambil data Guru dari database
-  const myGuru = DB.guru.find(g => g.nama && g.nama.trim().toLowerCase() === CURRENT_USER.nama.trim().toLowerCase());
-  if (myGuru) { guruName = myGuru.nama; nuptk = myGuru.nip || '-'; }
-
-  if (role === 'guru' && mapelId) {
-    const mapelGuru = DB.guru.find(g => g.mapelId === mapelId);
-    if (mapelGuru) { guruName = mapelGuru.nama; nuptk = mapelGuru.nip || '-'; }
-  }
-
-  if (role === 'wali') { jabatanKanan = 'Wali Kelas'; } 
-  else if (role === 'kepsek' || CURRENT_USER.role.toLowerCase().includes('kepsek')) { 
-    jabatanKanan = 'Kepala Sekolah'; 
-    guruName = kepsek; 
-    nuptk = nrks; // Gunakan NRKS untuk kepsek
-  }
-
-  // DESAIN TTD BARU (Lebih Rapi)
-  ttdKiri = `
-    <div style="text-align:center; width:45%;">
-      <p>Mengetahui,</p>
-      <p>Kepala Sekolah</p>
-      <div style="height: 60px;"></div>
-      <p style="font-weight:bold; text-decoration:underline; margin-bottom: 2px;">${kepsek}</p>
-      <p style="margin-top: 0;">NRKS: ${nrks}</p>
-    </div>`;
-    
-  ttdKanan = `
-    <div style="text-align:center; width:45%;">
-      <p>Garut, ${tgl}</p>
-      <p>${jabatanKanan}</p>
-      <div style="height: 60px;"></div>
-      <p style="font-weight:bold; text-decoration:underline; margin-bottom: 2px;">${guruName}</p>
-      <p style="margin-top: 0;">NUPTK: ${nuptk}</p>
-    </div>`;
-
-  return `<div style="display:flex; justify-content:space-between; margin-top:30px;">${ttdKiri}${ttdKanan}</div>`;
-}
     // ==========================================
     // RENDER FUNCTIONS
     // ==========================================
     function renderDashboard() {
       const waliInfo = getMyWaliKelasInfo();
       let infoHtml = waliInfo ? `<div class="card" style="background:#eff6ff; border-left:4px solid var(--primary);"><h3>👨‍🏫 Anda adalah Wali Kelas: <span style="color:var(--primary)">${waliInfo.kelasNama}</span></h3></div>` : '';
-
       return `
         ${infoHtml}
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:12px; margin-bottom:16px;">
@@ -429,249 +354,170 @@ function getTandaTangan(role = 'guru', mapelId = null) {
         </div>`;
     }
 
-function renderGuru() {
-  return `
-    <div class="card" id="formGuruCard">
-      <h3 id="formGuruTitle">💼 Tambah Guru</h3>
-      <form onsubmit="submitGuru(event)" id="formGuru">
-        <input type="hidden" name="id" id="guruId">
-        <div class="form-grid">
-          <div class="field"><label>NUPTK / NIP</label><input name="nip" id="guruNip" required></div>
-          <div class="field"><label>Nama Lengkap</label><input name="nama" id="guruNama" required></div>
-          
-          <div class="field">
-            <label style="display:flex; justify-content:space-between; align-items:center;">
-              Mapel yang Diampu
-              <button type="button" class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px; border-radius:4px;" onclick="tambahMapelBaru()">+ Mapel Baru</button>
-            </label>
-            <select name="mapelId" id="guruMapel" required>
-              <option value="">-- Pilih Mapel --</option>
-              ${DB.mapel.map(m => `<option value="${m.id}">${m.nama}</option>`).join('')}
-            </select>
-          </div>
-
-          <div class="field">
-            <label style="display:flex; justify-content:space-between; align-items:center;">
-              Kelas yang Diampu
-              <button type="button" class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px; border-radius:4px;" onclick="tambahKelasBaru()">+ Kelas Baru</button>
-            </label>
-            <select name="kelasIds" id="guruKelasIds" multiple style="height: 100px;">
-              ${DB.kelas.map(k => `<option value="${k.id}">${k.nama}</option>`).join('')}
-            </select>
-            <small style="color:var(--muted); font-size:10px;">Tahan Ctrl/Shift untuk pilih banyak kelas</small>
-          </div>
-
-          <div class="field"><label>Status</label>
-            <select name="status" id="guruStatus">
-              <option>PNS</option><option>PPPK</option><option>GTT</option><option>Honorer</option>
-            </select>
-          </div>
+    function renderGuru() {
+      return `
+        <div class="card" id="formGuruCard">
+          <h3 id="formGuruTitle">💼 Tambah Guru</h3>
+          <form onsubmit="submitGuru(event)" id="formGuru">
+            <input type="hidden" name="id" id="guruId">
+            <div class="form-grid">
+              <div class="field"><label>NUPTK / NIP</label><input name="nip" id="guruNip" required></div>
+              <div class="field"><label>Nama Lengkap</label><input name="nama" id="guruNama" required></div>
+              <div class="field">
+                <label style="display:flex; justify-content:space-between; align-items:center;">
+                  Mapel yang Diampu
+                  <button type="button" class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px; border-radius:4px;" onclick="tambahMapelBaru()">+ Mapel Baru</button>
+                </label>
+                <select name="mapelId" id="guruMapel" required>
+                  <option value="">-- Pilih Mapel --</option>
+                  ${DB.mapel.map(m => `<option value="${m.id}">${m.nama}</option>`).join('')}
+                </select>
+              </div>
+              <div class="field">
+                <label style="display:flex; justify-content:space-between; align-items:center;">
+                  Kelas yang Diampu
+                  <button type="button" class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px; border-radius:4px;" onclick="tambahKelasBaru()">+ Kelas Baru</button>
+                </label>
+                <select name="kelasIds" id="guruKelasIds" multiple style="height: 100px;">
+                  ${DB.kelas.map(k => `<option value="${k.id}">${k.nama}</option>`).join('')}
+                </select>
+                <small style="color:var(--muted); font-size:10px;">Tahan Ctrl/Shift untuk pilih banyak kelas</small>
+              </div>
+              <div class="field"><label>Status</label>
+                <select name="status" id="guruStatus">
+                  <option>PNS</option><option>PPPK</option><option>GTT</option><option>Honorer</option>
+                </select>
+              </div>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-primary" type="submit" id="btnSimpanGuru">💾 Simpan Guru</button>
+              <button class="btn btn-secondary" type="button" onclick="resetFormGuru()" id="btnBatalGuru" style="display:none;">Batal Edit</button>
+            </div>
+          </form>
         </div>
-        <div class="btn-row">
-          <button class="btn btn-primary" type="submit" id="btnSimpanGuru">💾 Simpan Guru</button>
-          <button class="btn btn-secondary" type="button" onclick="resetFormGuru()" id="btnBatalGuru" style="display:none;">Batal Edit</button>
-        </div>
-      </form>
-    </div>
-    <div class="card">
-      <h3>📋 Daftar Guru & Pegawai (${DB.guru.length} Data)</h3>
-      <div class="table-wrap"><table><thead><tr><th>NUPTK</th><th>Nama</th><th>Mapel</th><th>Kelas Mengajar</th><th>Wali Kelas</th><th>Aksi</th></tr></thead>
-      <tbody>${DB.guru.map(g => {
-        const waliKelas = DB.kelas.find(k => k.waliKelasId === g.id);
-        return `<tr>
-          <td>${esc(g.nip)}</td>
-          <td>${esc(g.nama)}</td>
-          <td><b>${esc(nMapel(g.mapelId))}</b></td>
-          <td>${nKelasMengajar(g.kelasIds)}</td>
-          <td>${waliKelas ? `<span class="badge b-blue">${waliKelas.nama}</span>` : '-'}</td>
-          <td>
-            <button class="btn btn-warning btn-sm" onclick="editGuru('${g.id}')">Edit</button>
-            <button class="btn btn-primary btn-sm" onclick="editWaliKelas('${g.id}')">Set Wali Kelas</button>
-            <button class="btn btn-danger btn-sm" onclick="deleteData('guru','${g.id}')">Hapus</button>
-          </td>
-        </tr>`;
-      }).join('')}</tbody></table></div>
-    </div>`;
-}
-
-// FUNGSI BANTUAN: Mengubah ID Kelas menjadi Badge Hijau
-function nKelasMengajar(idsStr) {
-  if (!idsStr) return '<span class="badge b-red">Belum diset</span>';
-  const ids = String(idsStr).split(',');
-  const names = ids.map(id => nKelas(id)).filter(name => name !== '—');
-  if (names.length === 0) return '<span class="badge b-red">Belum diset</span>';
-  return names.map(n => `<span class="badge b-green">${n}</span>`).join(' ');
-}
-    
-window.editGuru = (id) => {
-  const g = DB.guru.find(x => x.id === id);
-  if (!g) return;
-  
-  document.getElementById('guruId').value = g.id;
-  document.getElementById('guruNip').value = g.nip || '';
-  document.getElementById('guruNama').value = g.nama || '';
-  document.getElementById('guruMapel').value = g.mapelId || '';
-  document.getElementById('guruStatus').value = g.status || 'PNS';
-  
-  const selectedKelas = String(g.kelasIds || '').split(',');
-  const selectEl = document.getElementById('guruKelasIds');
-  Array.from(selectEl.options).forEach(opt => {
-    opt.selected = selectedKelas.includes(opt.value);
-  });
-  
-  document.getElementById('formGuruTitle').innerText = '✏️ Edit Data Guru';
-  document.getElementById('btnSimpanGuru').innerText = '💾 Update Data';
-  document.getElementById('btnBatalGuru').style.display = 'inline-flex';
-  document.getElementById('formGuruCard').scrollIntoView({ behavior: 'smooth' });
-};
-
-window.resetFormGuru = () => {
-  document.getElementById('guruId').value = '';
-  document.getElementById('formGuru').reset();
-  document.getElementById('formGuruTitle').innerText = '💼 Tambah Guru';
-  document.getElementById('btnSimpanGuru').innerText = '💾 Simpan Guru';
-  document.getElementById('btnBatalGuru').style.display = 'none';
-};
-
-window.submitGuru = async (e) => {
-  e.preventDefault();
-  const formData = new FormData(e.target);
-  const data = Object.fromEntries(formData.entries());
-  
-  const selectEl = document.getElementById('guruKelasIds');
-  const selectedKelas = Array.from(selectEl.selectedOptions).map(opt => opt.value);
-  data.kelasIds = selectedKelas.join(','); 
-  
-  const id = data.id;
-  delete data.id;
-  
-  showLoading('Menyimpan...');
-  try {
-    if (id) {
-      await apiCall('update', 'guru', { id: id, data: data });
-      const idx = DB.guru.findIndex(x => x.id === id);
-      if (idx > -1) DB.guru[idx] = { id, ...data };
-      toast('Data guru berhasil diupdate!');
-    } else {
-      const res = await apiCall('create', 'guru', { data: data });
-      DB.guru.push(res.data);
-      toast('Guru baru berhasil disimpan!');
+        <div class="card">
+          <h3>📋 Daftar Guru & Pegawai (${DB.guru.length} Data)</h3>
+          <div class="table-wrap"><table><thead><tr><th>NUPTK</th><th>Nama</th><th>Mapel</th><th>Kelas Mengajar</th><th>Wali Kelas</th><th>Aksi</th></tr></thead>
+          <tbody>${DB.guru.map(g => {
+            const waliKelas = DB.kelas.find(k => k.waliKelasId === g.id);
+            return `<tr>
+              <td>${esc(g.nip)}</td>
+              <td>${esc(g.nama)}</td>
+              <td><b>${esc(nMapel(g.mapelId))}</b></td>
+              <td>${nKelasMengajar(g.kelasIds)}</td>
+              <td>${waliKelas ? `<span class="badge b-blue">${waliKelas.nama}</span>` : '-'}</td>
+              <td>
+                <button class="btn btn-warning btn-sm" onclick="editGuru('${g.id}')">Edit</button>
+                <button class="btn btn-primary btn-sm" onclick="editWaliKelas('${g.id}')">Set Wali Kelas</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteData('guru','${g.id}')">Hapus</button>
+              </td>
+            </tr>`;
+          }).join('')}</tbody></table></div>
+        </div>`;
     }
-    resetFormGuru();
-    navigate('guru');
-  } catch (err) { 
-    toast(err.message, 'error'); 
-  } finally { 
-    hideLoading(); 
-  }
-};
 
-window.tambahMapelBaru = async () => {
-  const nama = prompt("Masukkan Nama Mata Pelajaran Baru:\n(Contoh: Bahasa Sunda)");
-  if (!nama) return;
-  const kode = prompt("Masukkan Kode Mapel (3 huruf):\n(Contoh: BSD)", nama.substring(0, 3).toUpperCase());
-  if (!kode) return;
+    function nKelasMengajar(idsStr) {
+      if (!idsStr) return '<span class="badge b-red">Belum diset</span>';
+      const ids = String(idsStr).split(',');
+      const names = ids.map(id => nKelas(id)).filter(name => name !== '—');
+      if (names.length === 0) return '<span class="badge b-red">Belum diset</span>';
+      return names.map(n => `<span class="badge b-green">${n}</span>`).join(' ');
+    }
 
-  showLoading('Menyimpan mapel...');
-  try {
-    const res = await apiCall('create', 'mapel', { data: { nama: nama, kode: kode } });
-    DB.mapel.push(res.data);
-    toast('Mapel baru berhasil ditambahkan!');
-    const currentEditId = document.getElementById('guruId').value;
-    navigate('guru');
-    setTimeout(() => {
-      if (currentEditId) editGuru(currentEditId);
-      document.getElementById('guruMapel').value = res.data.id;
-    }, 100);
-  } catch (err) { toast(err.message, 'error'); } finally { hideLoading(); }
-};
+    window.editGuru = (id) => {
+      const g = DB.guru.find(x => x.id === id);
+      if (!g) return;
+      document.getElementById('guruId').value = g.id; document.getElementById('guruNip').value = g.nip || '';
+      document.getElementById('guruNama').value = g.nama || ''; document.getElementById('guruMapel').value = g.mapelId || '';
+      document.getElementById('guruStatus').value = g.status || 'PNS';
+      const selectedKelas = String(g.kelasIds || '').split(',');
+      Array.from(document.getElementById('guruKelasIds').options).forEach(opt => { opt.selected = selectedKelas.includes(opt.value); });
+      document.getElementById('formGuruTitle').innerText = '✏️ Edit Data Guru';
+      document.getElementById('btnSimpanGuru').innerText = '💾 Update Data';
+      document.getElementById('btnBatalGuru').style.display = 'inline-flex';
+      document.getElementById('formGuruCard').scrollIntoView({ behavior: 'smooth' });
+    };
 
-window.tambahKelasBaru = async () => {
-  const nama = prompt("Masukkan Nama Kelas Baru:\n(Contoh: VII C)");
-  if (!nama) return;
-  const tingkat = prompt("Masukkan Tingkat Kelas (Angka):\n(Contoh: 7, 8, 9)", nama.substring(0, 1));
-  if (!tingkat) return;
+    window.resetFormGuru = () => {
+      document.getElementById('guruId').value = ''; document.getElementById('formGuru').reset();
+      document.getElementById('formGuruTitle').innerText = '💼 Tambah Guru';
+      document.getElementById('btnSimpanGuru').innerText = '💾 Simpan Guru';
+      document.getElementById('btnBatalGuru').style.display = 'none';
+    };
 
-  showLoading('Menyimpan kelas...');
-  try {
-    const res = await apiCall('create', 'kelas', { data: { nama: nama, tingkat: tingkat, waliKelasId: '' } });
-    DB.kelas.push(res.data);
-    toast('Kelas baru berhasil ditambahkan!');
-    const currentEditId = document.getElementById('guruId').value;
-    navigate('guru');
-    setTimeout(() => {
-      if (currentEditId) editGuru(currentEditId);
+    window.submitGuru = async (e) => {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(e.target).entries());
       const selectEl = document.getElementById('guruKelasIds');
-      const opt = Array.from(selectEl.options).find(o => o.value === res.data.id);
-      if (opt) opt.selected = true;
-    }, 100);
-  } catch (err) { toast(err.message, 'error'); } finally { hideLoading(); }
-};
-window.submitGuru = async (e) => {
-  e.preventDefault();
-  
-  // Ambil data dari form
-  const formData = new FormData(e.target);
-  const data = Object.fromEntries(formData.entries());
-  
-  // Ambil data multiple select kelasIds
-  const selectEl = document.getElementById('guruKelasIds');
-  const selectedKelas = Array.from(selectEl.selectedOptions).map(opt => opt.value);
-  data.kelasIds = selectedKelas.join(','); // Simpan sebagai teks dipisah koma
-  
-  const id = data.id;
-  delete data.id;
-  
-  showLoading('Menyimpan...');
-  try {
-    if (id) {
-      await apiCall('update', 'guru', { id: id, data: data });
-      const idx = DB.guru.findIndex(x => x.id === id);
-      if (idx > -1) DB.guru[idx] = { id, ...data };
-      toast('Data guru berhasil diupdate!');
-    } else {
-      const res = await apiCall('create', 'guru', { data: data });
-      DB.guru.push(res.data);
-      toast('Guru baru berhasil disimpan!');
-    }
-    resetFormGuru();
-    navigate('guru');
-  } catch (err) { 
-    toast(err.message, 'error'); 
-  } finally { 
-    hideLoading(); 
-  }
-};
-    
+      data.kelasIds = Array.from(selectEl.selectedOptions).map(opt => opt.value).join(','); 
+      const id = data.id; delete data.id;
+      showLoading('Menyimpan...');
+      try {
+        if (id) {
+          await apiCall('update', 'guru', { id: id, data: data });
+          const idx = DB.guru.findIndex(x => x.id === id); if (idx > -1) DB.guru[idx] = { id, ...data };
+          toast('Data guru berhasil diupdate!');
+        } else {
+          const res = await apiCall('create', 'guru', { data: data }); DB.guru.push(res.data);
+          toast('Guru baru berhasil disimpan!');
+        }
+        resetFormGuru(); navigate('guru');
+      } catch (err) { toast(err.message, 'error'); } finally { hideLoading(); }
+    };
+
+    window.tambahMapelBaru = async () => {
+      const nama = prompt("Masukkan Nama Mata Pelajaran Baru:\n(Contoh: Bahasa Sunda)");
+      if (!nama) return;
+      const kode = prompt("Masukkan Kode Mapel (3 huruf):\n(Contoh: BSD)", nama.substring(0, 3).toUpperCase());
+      if (!kode) return;
+      showLoading('Menyimpan mapel...');
+      try {
+        const res = await apiCall('create', 'mapel', { data: { nama: nama, kode: kode } });
+        DB.mapel.push(res.data); toast('Mapel baru berhasil ditambahkan!');
+        const currentEditId = document.getElementById('guruId').value;
+        navigate('guru');
+        setTimeout(() => {
+          if (currentEditId) editGuru(currentEditId);
+          document.getElementById('guruMapel').value = res.data.id;
+        }, 100);
+      } catch (err) { toast(err.message, 'error'); } finally { hideLoading(); }
+    };
+
+    window.tambahKelasBaru = async () => {
+      const nama = prompt("Masukkan Nama Kelas Baru:\n(Contoh: VII C)");
+      if (!nama) return;
+      const tingkat = prompt("Masukkan Tingkat Kelas (Angka):\n(Contoh: 7, 8, 9)", nama.substring(0, 1));
+      if (!tingkat) return;
+      showLoading('Menyimpan kelas...');
+      try {
+        const res = await apiCall('create', 'kelas', { data: { nama: nama, tingkat: tingkat, waliKelasId: '' } });
+        DB.kelas.push(res.data); toast('Kelas baru berhasil ditambahkan!');
+        const currentEditId = document.getElementById('guruId').value;
+        navigate('guru');
+        setTimeout(() => {
+          if (currentEditId) editGuru(currentEditId);
+          const selectEl = document.getElementById('guruKelasIds');
+          const opt = Array.from(selectEl.options).find(o => o.value === res.data.id);
+          if (opt) opt.selected = true;
+        }, 100);
+      } catch (err) { toast(err.message, 'error'); } finally { hideLoading(); }
+    };
+
     window.editWaliKelas = async (guruId) => {
       const currentWali = DB.kelas.find(k => k.waliKelasId === guruId);
       const targetKelasId = prompt(`Pilih ID Kelas:\n(0 = Lepas Jabatan)\n\n${DB.kelas.map((k,i)=>`${i+1}. ${k.nama}`).join('\n')}`, currentWali ? (DB.kelas.findIndex(k => k.id === currentWali.id) + 1) : '0');
-      
       if (targetKelasId === null) return;
       const idx = parseInt(targetKelasId) - 1;
-
       showLoading('Memproses...');
       if (idx === -1) { 
-        for (let k of DB.kelas) {
-          if (k.waliKelasId === guruId) {
-            await apiCall('update', 'kelas', { id: k.id, data: { waliKelasId: '' } });
-            k.waliKelasId = ''; 
-          }
-        }
+        for (let k of DB.kelas) if (k.waliKelasId === guruId) { await apiCall('update', 'kelas', { id: k.id, data: { waliKelasId: '' } }); k.waliKelasId = ''; }
         toast('Jabatan wali kelas dilepas');
       } else {
-        const targetKelas = DB.kelas[idx];
-        if (!targetKelas) { hideLoading(); return alert('Pilihan tidak valid'); }
-        
+        const targetKelas = DB.kelas[idx]; if (!targetKelas) { hideLoading(); return alert('Pilihan tidak valid'); }
         const oldWali = DB.kelas.find(k => k.waliKelasId === guruId);
-        if (oldWali) {
-          await apiCall('update', 'kelas', { id: oldWali.id, data: { waliKelasId: '' } });
-          oldWali.waliKelasId = '';
-        }
-
+        if (oldWali) { await apiCall('update', 'kelas', { id: oldWali.id, data: { waliKelasId: '' } }); oldWali.waliKelasId = ''; }
         await apiCall('update', 'kelas', { id: targetKelas.id, data: { waliKelasId: guruId } });
-        targetKelas.waliKelasId = guruId;
-        toast(`Guru dijadikan Wali Kelas ${targetKelas.nama}`);
+        targetKelas.waliKelasId = guruId; toast(`Guru dijadikan Wali Kelas ${targetKelas.nama}`);
       }
       hideLoading(); navigate('guru');
     };
@@ -683,977 +529,282 @@ window.submitGuru = async (e) => {
       </div></div><div id="subContent"></div>`;
     }
 
-        function activateSubTab(t) {
+    function activateSubTab(t) {
       currentSubTab = t;
       let html = '';
       const isGuru = CURRENT_USER.role.toLowerCase().includes('guru');
       const waliInfo = getMyWaliKelasInfo();
-      
       let myGuruId = null;
       if (isGuru || waliInfo) {
         const myGuru = DB.guru.find(g => g.nama && g.nama.trim().toLowerCase() === CURRENT_USER.nama.trim().toLowerCase());
         if (myGuru) myGuruId = myGuru.id;
       }
 
-      // ==========================================
-      // 1. SUB-TAB KELAS
-      // ==========================================
       if (t === 'kelas') {
-        let tombolRapor = (!isGuru && !waliInfo) ? `<button class="btn btn-danger" onclick="cetakRaporWaliKelas()">🖨️ Cetak Rapor Wali Kelas</button>` : 
-                          (waliInfo ? `<button class="btn btn-danger" onclick="cetakRaporWaliKelas()">🖨️ Cetak Rapor Kelas ${waliInfo.kelasNama}</button>` : '');
+        let tombolRapor = (!isGuru && !waliInfo) ? `<button class="btn btn-danger" onclick="cetakRaporWaliKelas()">🖨️ Cetak Rapor Wali Kelas</button>` : (waliInfo ? `<button class="btn btn-danger" onclick="cetakRaporWaliKelas()">🖨️ Cetak Rapor Kelas ${waliInfo.kelasNama}</button>` : '');
         let kelasToShow = waliInfo ? DB.kelas.filter(k => k.id === waliInfo.kelasId) : DB.kelas;
-
-        html = `
-          <div class="card">
-            <h3>Data Kelas</h3><div class="btn-row" style="margin-bottom:15px;">${tombolRapor}</div>
-            <div class="table-wrap"><table><thead><tr><th>Nama</th><th>Tingkat</th><th>Wali Kelas</th></tr></thead>
-            <tbody>${kelasToShow.map(k => `<tr><td>${esc(k.nama)}</td><td>${esc(k.tingkat)}</td><td>${esc(nGuru(k.waliKelasId))}</td></tr>`).join('')}</tbody></table></div>
-          </div>`;
+        html = `<div class="card"><h3>Data Kelas</h3><div class="btn-row" style="margin-bottom:15px;">${tombolRapor}</div><div class="table-wrap"><table><thead><tr><th>Nama</th><th>Tingkat</th><th>Wali Kelas</th></tr></thead><tbody>${kelasToShow.map(k => `<tr><td>${esc(k.nama)}</td><td>${esc(k.tingkat)}</td><td>${esc(nGuru(k.waliKelasId))}</td></tr>`).join('')}</tbody></table></div></div>`;
       } 
-      // ==========================================
-      // 2. SUB-TAB JADWAL
-      // ==========================================
       else if (t === 'jadwal') {
         const isAdmin = CURRENT_USER.role.toLowerCase().includes('admin');
         let jadwalToShow = DB.jadwal;
         if (waliInfo) jadwalToShow = DB.jadwal.filter(j => j.kelasId === waliInfo.kelasId);
         else if (isGuru && myGuruId) jadwalToShow = DB.jadwal.filter(j => j.guruId === myGuruId);
 
-        // Urutkan berdasarkan Hari dan Jam
         const urutanHari = { 'Senin': 1, 'Selasa': 2, 'Rabu': 3, 'Kamis': 4, 'Jumat': 5, 'Sabtu': 6 };
-        jadwalToShow.sort((a, b) => {
-          if (urutanHari[a.hari] !== urutanHari[b.hari]) return urutanHari[a.hari] - urutanHari[b.hari];
-          return String(a.jamMulai).localeCompare(String(b.jamMulai));
-        });
+        jadwalToShow.sort((a, b) => { if (urutanHari[a.hari] !== urutanHari[b.hari]) return urutanHari[a.hari] - urutanHari[b.hari]; return String(a.jamMulai).localeCompare(String(b.jamMulai)); });
 
         let formJadwal = '';
         if (isAdmin) {
-          formJadwal = `
-            <div class="card" id="formJadwalCard">
-              <h3 id="formJadwalTitle">📅 ${editJadwalId ? 'Edit' : 'Tambah'} Jadwal Pelajaran</h3>
-              <form onsubmit="submitJadwal(event)" id="formJadwal">
-                <input type="hidden" name="id" id="jadwalId" value="${editJadwalId || ''}">
+          formJadwal = `<div class="card" id="formJadwalCard"><h3 id="formJadwalTitle">📅 ${editJadwalId ? 'Edit' : 'Tambah'} Jadwal Pelajaran</h3>
+              <form onsubmit="submitJadwal(event)" id="formJadwal"><input type="hidden" name="id" id="jadwalId" value="${editJadwalId || ''}">
                 <div class="form-grid">
-                  <div class="field">
-                    <label>Hari</label>
-                    <select name="hari" id="jadwalHari" required>
-                      <option value="Senin">Senin</option><option value="Selasa">Selasa</option>
-                      <option value="Rabu">Rabu</option><option value="Kamis">Kamis</option>
-                      <option value="Jumat">Jumat</option><option value="Sabtu">Sabtu</option>
-                    </select>
-                  </div>
+                  <div class="field"><label>Hari</label><select name="hari" id="jadwalHari" required><option value="Senin">Senin</option><option value="Selasa">Selasa</option><option value="Rabu">Rabu</option><option value="Kamis">Kamis</option><option value="Jumat">Jumat</option><option value="Sabtu">Sabtu</option></select></div>
                   <div class="field"><label>Jam Mulai</label><input type="time" name="jamMulai" id="jadwalMulai" required></div>
                   <div class="field"><label>Jam Selesai</label><input type="time" name="jamSelesai" id="jadwalSelesai" required></div>
-                  <div class="field">
-                    <label>Kelas</label>
-                    <select name="kelasId" id="jadwalKelas" required>
-                      ${DB.kelas.map(k => `<option value="${k.id}">${k.nama}</option>`).join('')}
-                    </select>
-                  </div>
-                  <div class="field">
-                    <label>Mata Pelajaran</label>
-                    <select name="mapelId" id="jadwalMapel" required onchange="filterGuruJadwal()">
-                      ${DB.mapel.map(m => `<option value="${m.id}">${m.nama}</option>`).join('')}
-                    </select>
-                  </div>
-                  <div class="field">
-                    <label>Guru Pengampu</label>
-                    <select name="guruId" id="jadwalGuru" required>
-                      <option value="">-- Pilih Mapel Dulu --</option>
-                    </select>
-                  </div>
+                  <div class="field"><label>Kelas</label><select name="kelasId" id="jadwalKelas" required>${DB.kelas.map(k => `<option value="${k.id}">${k.nama}</option>`).join('')}</select></div>
+                  <div class="field"><label>Mata Pelajaran</label><select name="mapelId" id="jadwalMapel" required onchange="filterGuruJadwal()">${DB.mapel.map(m => `<option value="${m.id}">${m.nama}</option>`).join('')}</select></div>
+                  <div class="field"><label>Guru Pengampu</label><select name="guruId" id="jadwalGuru" required><option value="">-- Pilih Mapel Dulu --</option></select></div>
                 </div>
-                <div class="btn-row">
-                  <button class="btn btn-primary" type="submit" id="btnSimpanJadwal">💾 Simpan Jadwal</button>
-                  ${editJadwalId ? `<button class="btn btn-secondary" type="button" onclick="editJadwalId=null; activateSubTab('jadwal')">Batal</button>` : ''}
-                </div>
-              </form>
-            </div>
-          `;
+                <div class="btn-row"><button class="btn btn-primary" type="submit" id="btnSimpanJadwal">💾 Simpan Jadwal</button>${editJadwalId ? `<button class="btn btn-secondary" type="button" onclick="editJadwalId=null; activateSubTab('jadwal')">Batal</button>` : ''}</div>
+              </form></div>`;
         }
-
         let tombolGenerate = isAdmin ? `<button class="btn btn-success" onclick="generateJadwalOtomatis()">✨ Generate Jadwal Otomatis</button>` : '';
-
-        html = `
-          ${formJadwal}
-          <div class="card">
-            <h3>Jadwal ${waliInfo ? 'Kelas ' + waliInfo.kelasNama : (isGuru ? 'Mengajar Anda' : 'Semua Kelas')}</h3>
-            
-            <div class="btn-row" style="margin-bottom: 15px;">${tombolGenerate}</div>
-
-            <div class="table-wrap"><table><thead><tr><th>Hari</th><th>Jam</th><th>Kelas</th><th>Mapel</th><th>Guru</th>${isAdmin ? '<th>Aksi</th>' : ''}</tr></thead>
-            <tbody>${jadwalToShow.map(j => `<tr>
-              <td><b>${esc(j.hari)}</b></td>
-              <td>${esc(j.jamMulai)} - ${esc(j.jamSelesai)}</td>
-              <td><span class="badge b-blue">${esc(nKelas(j.kelasId))}</span></td>
-              <td>${esc(nMapel(j.mapelId))}</td>
-              <td>${esc(nGuru(j.guruId))}</td>
-              ${isAdmin ? `<td>
-                <button class="btn btn-warning btn-sm" onclick="editJadwal('${j.id}')">Edit</button>
-                <button class="btn btn-danger btn-sm" onclick="deleteData('jadwal','${j.id}')">Hapus</button>
-              </td>` : ''}
-            </tr>`).join('') || `<tr><td colspan="${isAdmin ? 6 : 5}" class="empty">Belum ada jadwal</td></tr>`}</tbody></table></div>
-          </div>`;
-        
-        // Panggil filter guru saat form dibuka
+        html = `${formJadwal}<div class="card"><h3>Jadwal ${waliInfo ? 'Kelas ' + waliInfo.kelasNama : (isGuru ? 'Mengajar Anda' : 'Semua Kelas')}</h3><div class="btn-row" style="margin-bottom: 15px;">${tombolGenerate}</div><div class="table-wrap"><table><thead><tr><th>Hari</th><th>Jam</th><th>Kelas</th><th>Mapel</th><th>Guru</th>${isAdmin ? '<th>Aksi</th>' : ''}</tr></thead><tbody>${jadwalToShow.map(j => `<tr><td><b>${esc(j.hari)}</b></td><td>${esc(j.jamMulai)} - ${esc(j.jamSelesai)}</td><td><span class="badge b-blue">${esc(nKelas(j.kelasId))}</span></td><td>${esc(nMapel(j.mapelId))}</td><td>${esc(nGuru(j.guruId))}</td>${isAdmin ? `<td><button class="btn btn-warning btn-sm" onclick="editJadwal('${j.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteData('jadwal','${j.id}')">Hapus</button></td>` : ''}</tr>`).join('') || `<tr><td colspan="${isAdmin ? 6 : 5}" class="empty">Belum ada jadwal</td></tr>`}</tbody></table></div></div>`;
         setTimeout(() => filterGuruJadwal(), 50);
-
-        // Jika sedang mode Edit, isi form dengan data yang ada
         if (editJadwalId) {
           setTimeout(() => {
             const j = DB.jadwal.find(x => x.id === editJadwalId);
             if (j) {
-              document.getElementById('jadwalHari').value = j.hari;
-              document.getElementById('jadwalMulai').value = j.jamMulai;
-              document.getElementById('jadwalSelesai').value = j.jamSelesai;
-              document.getElementById('jadwalKelas').value = j.kelasId;
-              document.getElementById('jadwalMapel').value = j.mapelId;
-              filterGuruJadwal(); // Filter guru berdasarkan mapel
-              setTimeout(() => {
-                document.getElementById('jadwalGuru').value = j.guruId;
-              }, 50);
+              document.getElementById('jadwalHari').value = j.hari; document.getElementById('jadwalMulai').value = j.jamMulai; document.getElementById('jadwalSelesai').value = j.jamSelesai; document.getElementById('jadwalKelas').value = j.kelasId; document.getElementById('jadwalMapel').value = j.mapelId;
+              filterGuruJadwal();
+              setTimeout(() => { document.getElementById('jadwalGuru').value = j.guruId; }, 50);
             }
           }, 100);
         }
       } 
-      // ==========================================
-      // 3. SUB-TAB NILAI
-      // ==========================================
       else if (t === 'nilai') {
         let filterMapel = DB.mapel, filterKelas = DB.kelas;
         if (isGuru || waliInfo) {
           const myGuru = DB.guru.find(g => g.id === myGuruId);
-          if (myGuru) {
-            filterMapel = DB.mapel.filter(m => m.id === myGuru.mapelId);
-            let myKelasIds = DB.jadwal.filter(j => j.guruId === myGuruId).map(j => j.kelasId);
-            if (waliInfo) myKelasIds.push(waliInfo.kelasId);
-            filterKelas = DB.kelas.filter(k => [...new Set(myKelasIds)].includes(k.id));
-          } else filterMapel = [];
+          if (myGuru) { filterMapel = DB.mapel.filter(m => m.id === myGuru.mapelId); let myKelasIds = DB.jadwal.filter(j => j.guruId === myGuruId).map(j => j.kelasId); if (waliInfo) myKelasIds.push(waliInfo.kelasId); filterKelas = DB.kelas.filter(k => [...new Set(myKelasIds)].includes(k.id)); } else filterMapel = [];
         }
-
-        if (filterMapel.length === 0) {
-          html = `<div class="card"><h3>📝 Input Nilai</h3><p style="color:var(--danger)">Akun Anda belum terhubung dengan Mata Pelajaran.</p></div>`;
-        } else {
-          html = `
-            <div class="card">
-              <h3>📝 Input Nilai Kelas</h3>
-              <div class="form-grid">
-                <div class="field"><label>Mata Pelajaran</label><select id="inpMapel">${filterMapel.map(m => `<option value="${m.id}">${m.nama}</option>`).join('')}</select></div>
-                <div class="field"><label>Kelas</label><select id="inpKelas">${filterKelas.map(k => `<option value="${k.id}">${k.nama}</option>`).join('')}</select></div>
-                <div class="field"><label>Semester</label><select id="inpSem"><option>Ganjil</option><option>Genap</option></select></div>
-                <div class="field"><label>Jumlah Nilai Harian</label><select id="inpHarianCount"><option value="1">1 Kali</option><option value="2">2 Kali</option><option value="3" selected>3 Kali</option></select></div>
-              </div>
-              <div class="btn-row">
-                <button class="btn btn-primary" onclick="muatTabelNilai()">Tampilkan Siswa</button>
-                <button class="btn btn-danger" onclick="cetakPDFNilai()">🖨️ Cetak PDF Nilai</button>
-                ${waliInfo ? `<button class="btn btn-warning" onclick="cetakRekapNilaiSemesteran()">📊 Rekap Nilai Semesteran</button>` : ''}
-              </div>
-            </div>
-            <div id="tabelNilaiContainer"></div>
-          `;
+        if (filterMapel.length === 0) { html = `<div class="card"><h3>📝 Input Nilai</h3><p style="color:var(--danger)">Akun Anda belum terhubung dengan Mata Pelajaran.</p></div>`; } 
+        else {
+          html = `<div class="card"><h3>📝 Input Nilai Kelas</h3><div class="form-grid"><div class="field"><label>Mata Pelajaran</label><select id="inpMapel">${filterMapel.map(m => `<option value="${m.id}">${m.nama}</option>`).join('')}</select></div><div class="field"><label>Kelas</label><select id="inpKelas">${filterKelas.map(k => `<option value="${k.id}">${k.nama}</option>`).join('')}</select></div><div class="field"><label>Semester</label><select id="inpSem"><option>Ganjil</option><option>Genap</option></select></div><div class="field"><label>Jumlah Nilai Harian</label><select id="inpHarianCount"><option value="1">1 Kali</option><option value="2">2 Kali</option><option value="3" selected>3 Kali</option></select></div></div><div class="btn-row"><button class="btn btn-primary" onclick="muatTabelNilai()">Tampilkan Siswa</button><button class="btn btn-danger" onclick="cetakPDFNilai()">🖨️ Cetak PDF Nilai</button>${waliInfo ? `<button class="btn btn-warning" onclick="cetakRekapNilaiSemesteran()">📊 Rekap Nilai Semesteran</button>` : ''}</div></div><div id="tabelNilaiContainer"></div>`;
         }
       }
-      // ==========================================
-      // 4. SUB-TAB ABSENSI
-      // ==========================================
       else if (t === 'absensi') {
         let filterMapel = DB.mapel, filterKelas = DB.kelas;
         if (isGuru || waliInfo) {
           const myGuru = DB.guru.find(g => g.id === myGuruId);
-          if (myGuru) {
-            filterMapel = DB.mapel.filter(m => m.id === myGuru.mapelId);
-            let myKelasIds = DB.jadwal.filter(j => j.guruId === myGuruId).map(j => j.kelasId);
-            if (waliInfo) myKelasIds.push(waliInfo.kelasId);
-            filterKelas = DB.kelas.filter(k => [...new Set(myKelasIds)].includes(k.id));
-          } else filterMapel = [];
+          if (myGuru) { filterMapel = DB.mapel.filter(m => m.id === myGuru.mapelId); let myKelasIds = DB.jadwal.filter(j => j.guruId === myGuruId).map(j => j.kelasId); if (waliInfo) myKelasIds.push(waliInfo.kelasId); filterKelas = DB.kelas.filter(k => [...new Set(myKelasIds)].includes(k.id)); } else filterMapel = [];
         }
-
-        if (filterMapel.length === 0) {
-          html = `<div class="card"><h3>✅ Absensi</h3><p style="color:var(--danger)">Akun Anda belum terhubung dengan Mata Pelajaran.</p></div>`;
-        } else {
-          html = `
-            <div class="card" style="padding:10px;">
-              <div style="display:flex; gap:5px;">
-                <button class="btn ${subTabAbsensi === 'input' ? 'btn-primary' : 'btn-secondary'}" onclick="subTabAbsensi='input'; activateSubTab('absensi')">Input Absensi</button>
-                <button class="btn ${subTabAbsensi === 'rekap' ? 'btn-primary' : 'btn-secondary'}" onclick="subTabAbsensi='rekap'; activateSubTab('absensi')">Rekap Absensi</button>
-              </div>
-            </div>
-          `;
+        if (filterMapel.length === 0) { html = `<div class="card"><h3>✅ Absensi</h3><p style="color:var(--danger)">Akun Anda belum terhubung dengan Mata Pelajaran.</p></div>`; } 
+        else {
+          html = `<div class="card" style="padding:10px;"><div style="display:flex; gap:5px;"><button class="btn ${subTabAbsensi === 'input' ? 'btn-primary' : 'btn-secondary'}" onclick="subTabAbsensi='input'; activateSubTab('absensi')">Input Absensi</button><button class="btn ${subTabAbsensi === 'rekap' ? 'btn-primary' : 'btn-secondary'}" onclick="subTabAbsensi='rekap'; activateSubTab('absensi')">Rekap Absensi</button></div></div>`;
           if (subTabAbsensi === 'input') {
-            html += `
-              <div class="card">
-                <h3>Input Absensi per Mapel</h3>
-                <div class="form-grid">
-                  <div class="field"><label>Mata Pelajaran</label><select id="inpAbsenMapel">${filterMapel.map(m => `<option value="${m.id}">${m.nama}</option>`).join('')}</select></div>
-                  <div class="field"><label>Kelas</label><select id="inpAbsenKelas">${filterKelas.map(k => `<option value="${k.id}">${k.nama}</option>`).join('')}</select></div>
-                  <div class="field"><label>Tanggal</label><input type="date" id="inpAbsenTgl" value="${new Date().toISOString().slice(0,10)}"></div>
-                </div>
-                <div class="btn-row"><button class="btn btn-primary" onclick="muatTabelAbsensi()">Tampilkan Siswa</button></div>
-              </div>
-              <div id="tabelAbsensiContainer"></div>
-            `;
+            html += `<div class="card"><h3>Input Absensi per Mapel</h3><div class="form-grid"><div class="field"><label>Mata Pelajaran</label><select id="inpAbsenMapel">${filterMapel.map(m => `<option value="${m.id}">${m.nama}</option>`).join('')}</select></div><div class="field"><label>Kelas</label><select id="inpAbsenKelas">${filterKelas.map(k => `<option value="${k.id}">${k.nama}</option>`).join('')}</select></div><div class="field"><label>Tanggal</label><input type="date" id="inpAbsenTgl" value="${new Date().toISOString().slice(0,10)}"></div></div><div class="btn-row"><button class="btn btn-primary" onclick="muatTabelAbsensi()">Tampilkan Siswa</button></div></div><div id="tabelAbsensiContainer"></div>`;
           } else {
-            html += `
-              <div class="card">
-                <h3>Rekap Absensi Harian</h3>
-                <div class="toolbar" style="display:flex; gap:10px; margin-bottom:15px; flex-wrap:wrap;">
-                  <select id="rekapAbsenKelas" class="btn btn-secondary" onchange="renderRekapAbsensi()">${filterKelas.map(k => `<option value="${k.id}">${k.nama}</option>`).join('')}</select>
-                  <select id="rekapAbsenMapel" class="btn btn-secondary" onchange="renderRekapAbsensi()">${filterMapel.map(m => `<option value="${m.id}">${m.nama}</option>`).join('')}</select>
-                  <button class="btn btn-danger" onclick="cetakPDFAbsensi()">🖨️ Cetak PDF Absensi</button>
-                </div>
-                <div id="rekapAbsenContainer"></div>
-              </div>
-            `;
+            html += `<div class="card"><h3>Rekap Absensi Harian</h3><div class="toolbar" style="display:flex; gap:10px; margin-bottom:15px; flex-wrap:wrap;"><select id="rekapAbsenKelas" class="btn btn-secondary" onchange="renderRekapAbsensi()">${filterKelas.map(k => `<option value="${k.id}">${k.nama}</option>`).join('')}</select><select id="rekapAbsenMapel" class="btn btn-secondary" onchange="renderRekapAbsensi()">${filterMapel.map(m => `<option value="${m.id}">${m.nama}</option>`).join('')}</select><button class="btn btn-danger" onclick="cetakPDFAbsensi()">🖨️ Cetak PDF Absensi</button></div><div id="rekapAbsenContainer"></div></div>`;
           }
         }
       }
-      
       $('#content').innerHTML = renderAkademik() + `<div id="subContent">${html}</div>`;
       if (t === 'absensi' && subTabAbsensi === 'rekap') renderRekapAbsensi();
     }
-    // ==========================================
-    // LOGIKA KASUS & JURNAL
-    // ==========================================
-    function renderKasus() {
-      const isGuru = CURRENT_USER.role.toLowerCase().includes('guru');
-      const waliInfo = getMyWaliKelasInfo();
-      
-      let myGuruId = null;
-      let filterMapelForm = DB.mapel;
-      let filterKelasForm = DB.kelas;
-      let kasusToShow = DB.kasus;
 
+    window.filterGuruJadwal = () => {
+      const mapelId = document.getElementById('jadwalMapel').value;
+      const selGuru = document.getElementById('jadwalGuru'); if (!selGuru) return;
+      const filteredGuru = DB.guru.filter(g => String(g.mapelId) === String(mapelId));
+      if (filteredGuru.length > 0) selGuru.innerHTML = filteredGuru.map(g => `<option value="${g.id}">${g.nama}</option>`).join('');
+      else selGuru.innerHTML = '<option value="">-- Tidak ada guru pengampu --</option>';
+    };
+
+    window.editJadwal = (id) => { editJadwalId = id; activateSubTab('jadwal'); };
+
+    window.submitJadwal = async (e) => {
+      e.preventDefault(); const data = Object.fromEntries(new FormData(e.target).entries());
+      const id = data.id; delete data.id;
+      showLoading('Menyimpan jadwal...');
+      try {
+        if (id) { await apiCall('update', 'jadwal', { id: id, data: data }); const idx = DB.jadwal.findIndex(x => x.id === id); if (idx > -1) DB.jadwal[idx] = { id, ...data }; toast('Jadwal berhasil diupdate!'); } 
+        else { const res = await apiCall('create', 'jadwal', { data: data }); DB.jadwal.push(res.data); toast('Jadwal baru berhasil disimpan!'); }
+        editJadwalId = null; activateSubTab('jadwal');
+      } catch (err) { toast(err.message, 'error'); } finally { hideLoading(); }
+    };
+
+    window.generateJadwalOtomatis = async () => {
+      if (!confirm('⚠️ PERINGATAN!\n\nIni akan MENGHAPUS semua jadwal yang ada saat ini dan membuat jadwal baru secara otomatis.\n\nApakah Anda yakin?')) return;
+      const timeSlots = [{mulai:'07:00',selesai:'07:40'},{mulai:'07:40',selesai:'08:20'},{mulai:'08:20',selesai:'09:00'},{mulai:'09:20',selesai:'10:00'},{mulai:'10:00',selesai:'10:40'},{mulai:'11:00',selesai:'11:40'},{mulai:'11:40',selesai:'12:20'},{mulai:'13:00',selesai:'13:40'}];
+      const days = ['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+      let teacherBusy = {}; let newJadwal = [];
+      const shuffledKelas = [...DB.kelas].sort(() => Math.random() - 0.5);
+      days.forEach(hari => {
+        timeSlots.forEach(slot => {
+          shuffledKelas.forEach(kelas => {
+            let eligibleGurus = DB.guru.filter(g => { const kelasIds = String(g.kelasIds || '').split(','); return kelasIds.includes(kelas.id); });
+            eligibleGurus.sort(() => Math.random() - 0.5); let assigned = false;
+            for (let guru of eligibleGurus) {
+              const key = `${guru.id}_${hari}_${slot.mulai}`;
+              if (!teacherBusy[key]) { teacherBusy[key] = true; newJadwal.push({ hari: hari, jamMulai: slot.mulai, jamSelesai: slot.selesai, kelasId: kelas.id, mapelId: guru.mapelId, guruId: guru.id }); assigned = true; break; }
+            }
+            if (!assigned) newJadwal.push({ hari: hari, jamMulai: slot.mulai, jamSelesai: slot.selesai, kelasId: kelas.id, mapelId: '', guruId: '' });
+          });
+        });
+      });
+      showLoading('Menghapus jadwal lama & menyimpan jadwal baru...');
+      try {
+        await apiCall('clearSheet', 'jadwal'); await apiCall('bulkSave', 'jadwal', { data: newJadwal });
+        toast('Jadwal otomatis berhasil dibuat!');
+        const res = await apiCall('getAllData'); DB = { ...DB, ...res.data }; activateSubTab('jadwal');
+      } catch (e) { toast(e.message, 'error'); } finally { hideLoading(); }
+    };
+
+    function renderKasus() {
+      const isGuru = CURRENT_USER.role.toLowerCase().includes('guru'); const waliInfo = getMyWaliKelasInfo();
+      let myGuruId = null, filterMapelForm = DB.mapel, filterKelasForm = DB.kelas, kasusToShow = DB.kasus;
       if (isGuru || waliInfo) {
         const myGuru = DB.guru.find(g => g.nama && g.nama.trim().toLowerCase() === CURRENT_USER.nama.trim().toLowerCase());
         if (myGuru) {
-          myGuruId = myGuru.id;
-          filterMapelForm = DB.mapel.filter(m => m.id === myGuru.mapelId);
-          
-          let myKelasIds = DB.jadwal.filter(j => j.guruId === myGuruId).map(j => j.kelasId);
-          if (waliInfo) myKelasIds.push(waliInfo.kelasId);
+          myGuruId = myGuru.id; filterMapelForm = DB.mapel.filter(m => m.id === myGuru.mapelId);
+          let myKelasIds = DB.jadwal.filter(j => j.guruId === myGuruId).map(j => j.kelasId); if (waliInfo) myKelasIds.push(waliInfo.kelasId);
           filterKelasForm = DB.kelas.filter(k => [...new Set(myKelasIds)].includes(k.id));
-
-          if (waliInfo) {
-            const mySiswaIds = DB.siswa.filter(s => s.kelasId === waliInfo.kelasId).map(s => s.id);
-            kasusToShow = DB.kasus.filter(k => mySiswaIds.includes(k.siswaId));
-          } else {
-            kasusToShow = DB.kasus.filter(k => k.mapelId === myGuru.mapelId);
-          }
-        } else {
-          filterMapelForm = [];
-        }
+          if (waliInfo) { const mySiswaIds = DB.siswa.filter(s => s.kelasId === waliInfo.kelasId).map(s => s.id); kasusToShow = DB.kasus.filter(k => mySiswaIds.includes(k.siswaId)); } 
+          else kasusToShow = DB.kasus.filter(k => k.mapelId === myGuru.mapelId);
+        } else filterMapelForm = [];
       }
-
       const defaultKelasId = filterKelasForm.length > 0 ? filterKelasForm[0].id : '';
       const defaultSiswaList = DB.siswa.filter(s => s.kelasId === defaultKelasId);
-
-      return `
-        <div class="card">
-          <h3>⚠️ Tambah Kasus Siswa</h3>
-          <form onsubmit="submitKasus(event)">
-            <div class="form-grid">
-              <div class="field"><label>Kelas</label>
-                <select id="kasusKelas" onchange="updateSiswaKasus()" required>
-                  ${filterKelasForm.map(k => `<option value="${k.id}">${k.nama}</option>`).join('')}
-                </select>
-              </div>
-              <div class="field"><label>Mata Pelajaran</label>
-                <select name="mapelId" required>
-                  ${filterMapelForm.map(m => `<option value="${m.id}">${m.nama}</option>`).join('')}
-                </select>
-              </div>
-              <div class="field"><label>Nama Siswa</label>
-                <select name="siswaId" id="kasusSiswa" required>
-                  ${defaultSiswaList.map(s => `<option value="${s.id}">${s.nama}</option>`).join('')}
-                </select>
-              </div>
-              <div class="field"><label>Tanggal</label><input type="date" name="tanggal" required value="${new Date().toISOString().slice(0,10)}"></div>
-              <div class="field"><label>Judul Kasus</label><input name="judul" required></div>
-              <div class="field" style="grid-column:1/-1"><label>Deskripsi / Kronologi</label><textarea name="deskripsi"></textarea></div>
-            </div>
-            <div class="btn-row">
-              <button class="btn btn-primary" type="submit">💾 Simpan Kasus</button>
-              <button class="btn btn-danger" type="button" onclick="cetakPDFKasus()">🖨️ Cetak PDF Kasus</button>
-            </div>
-          </form>
-        </div>
-        <div class="card">
-          <h3>📋 Daftar Kasus ${waliInfo ? `Kelas ${waliInfo.kelasNama}` : (isGuru ? 'Mapel Anda' : 'Semua')}</h3>
-          <div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Siswa</th><th>Mapel</th><th>Judul</th><th>Aksi</th></tr></thead>
-          <tbody>${kasusToShow.map(k => `<tr>
-            <td>${esc(k.tanggal)}</td>
-            <td><b>${esc(nSiswa(k.siswaId))}</b></td>
-            <td>${esc(nMapel(k.mapelId))}</td>
-            <td>${esc(k.judul)}</td>
-            <td><button class="btn btn-danger btn-sm" onclick="deleteData('kasus','${k.id}')">Hapus</button></td>
-          </tr>`).join('') || '<tr><td colspan="5" class="empty">Belum ada catatan kasus</td></tr>'}</tbody></table></div>
-        </div>`;
+      return `<div class="card"><h3>⚠️ Tambah Kasus Siswa</h3><form onsubmit="submitKasus(event)"><div class="form-grid"><div class="field"><label>Kelas</label><select id="kasusKelas" onchange="updateSiswaKasus()" required>${filterKelasForm.map(k => `<option value="${k.id}">${k.nama}</option>`).join('')}</select></div><div class="field"><label>Mata Pelajaran</label><select name="mapelId" required>${filterMapelForm.map(m => `<option value="${m.id}">${m.nama}</option>`).join('')}</select></div><div class="field"><label>Nama Siswa</label><select name="siswaId" id="kasusSiswa" required>${defaultSiswaList.map(s => `<option value="${s.id}">${s.nama}</option>`).join('')}</select></div><div class="field"><label>Tanggal</label><input type="date" name="tanggal" required value="${new Date().toISOString().slice(0,10)}"></div><div class="field"><label>Judul Kasus</label><input name="judul" required></div><div class="field" style="grid-column:1/-1"><label>Deskripsi / Kronologi</label><textarea name="deskripsi"></textarea></div></div><div class="btn-row"><button class="btn btn-primary" type="submit">💾 Simpan Kasus</button><button class="btn btn-danger" type="button" onclick="cetakPDFKasus()">🖨️ Cetak PDF Kasus</button></div></form></div><div class="card"><h3>📋 Daftar Kasus ${waliInfo ? `Kelas ${waliInfo.kelasNama}` : (isGuru ? 'Mapel Anda' : 'Semua')}</h3><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Siswa</th><th>Mapel</th><th>Judul</th><th>Aksi</th></tr></thead><tbody>${kasusToShow.map(k => `<tr><td>${formatTanggalIndo(k.tanggal)}</td><td><b>${esc(nSiswa(k.siswaId))}</b></td><td>${esc(nMapel(k.mapelId))}</td><td>${esc(k.judul)}</td><td><button class="btn btn-danger btn-sm" onclick="deleteData('kasus','${k.id}')">Hapus</button></td></tr>`).join('') || '<tr><td colspan="5" class="empty">Belum ada catatan kasus</td></tr>'}</tbody></table></div></div>`;
     }
 
-    window.updateSiswaKasus = () => {
-      const kelasId = document.getElementById('kasusKelas').value;
-      const siswaList = DB.siswa.filter(s => s.kelasId === kelasId);
-      document.getElementById('kasusSiswa').innerHTML = siswaList.map(s => `<option value="${s.id}">${s.nama}</option>`).join('');
-    };
+    window.updateSiswaKasus = () => { const kelasId = document.getElementById('kasusKelas').value; const siswaList = DB.siswa.filter(s => s.kelasId === kelasId); document.getElementById('kasusSiswa').innerHTML = siswaList.map(s => `<option value="${s.id}">${s.nama}</option>`).join(''); };
 
     async function submitKasus(e) {
-      e.preventDefault();
-      const data = Object.fromEntries(new FormData(e.target).entries());
-      data.status = 'Open';
+      e.preventDefault(); const data = Object.fromEntries(new FormData(e.target).entries()); data.status = 'Open';
       showLoading('Menyimpan...');
-      try {
-        const res = await apiCall('create', 'kasus', { data });
-        DB.kasus.push(res.data);
-        toast('Kasus disimpan'); navigate('kasus');
-      } catch (err) { toast(err.message, 'error'); } finally { hideLoading(); }
+      try { const res = await apiCall('create', 'kasus', { data }); DB.kasus.push(res.data); toast('Kasus disimpan'); navigate('kasus'); } catch (err) { toast(err.message, 'error'); } finally { hideLoading(); }
     }
 
     function renderJurnal() {
-      const isGuru = CURRENT_USER.role.toLowerCase().includes('guru');
-      const waliInfo = getMyWaliKelasInfo();
-      let myGuruId = null;
-      let filterMapelForm = DB.mapel;
-      let jurnalToShow = DB.jurnal;
-
-      if (isGuru || waliInfo) {
-        const myGuru = DB.guru.find(g => g.nama && g.nama.trim().toLowerCase() === CURRENT_USER.nama.trim().toLowerCase());
-        if (myGuru) {
-          myGuruId = myGuru.id;
-          filterMapelForm = DB.mapel.filter(m => m.id === myGuru.mapelId);
-          jurnalToShow = DB.jurnal.filter(j => j.mapelId === myGuru.mapelId);
-        } else {
-          filterMapelForm = [];
-        }
-      }
-
-      return `
-        <div class="card">
-          <h3>📓 Tambah Jurnal Kegiatan</h3>
-          <form onsubmit="submitJurnal(event)">
-            <div class="form-grid">
-              <div class="field"><label>Mata Pelajaran</label>
-                <select name="mapelId" required>
-                  ${filterMapelForm.map(m => `<option value="${m.id}">${m.nama}</option>`).join('')}
-                </select>
-              </div>
-              <div class="field"><label>Tanggal</label><input type="date" name="tanggal" required value="${new Date().toISOString().slice(0,10)}"></div>
-              <div class="field"><label>Judul / Materi</label><input name="judul" required></div>
-              <div class="field" style="grid-column:1/-1"><label>Isi Jurnal</label><textarea name="isi" required></textarea></div>
-            </div>
-            <div class="btn-row">
-              <button class="btn btn-primary" type="submit">💾 Simpan Jurnal</button>
-              <button class="btn btn-danger" type="button" onclick="cetakPDFJurnal()">🖨️ Cetak PDF Jurnal</button>
-            </div>
-          </form>
-        </div>
-        <div class="card">
-          <h3>📋 Daftar Jurnal ${isGuru ? 'Mapel Anda' : 'Semua'}</h3>
-          <div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Mapel</th><th>Judul</th><th>Aksi</th></tr></thead>
-          <tbody>${jurnalToShow.map(j => `<tr>
-            <td>${esc(j.tanggal)}</td><td>${esc(nMapel(j.mapelId))}</td><td>${esc(j.judul)}</td>
-            <td><button class="btn btn-danger btn-sm" onclick="deleteData('jurnal','${j.id}')">Hapus</button></td>
-          </tr>`).join('') || '<tr><td colspan="4" class="empty">Belum ada jurnal</td></tr>'}</tbody></table></div>
-        </div>`;
+      const isGuru = CURRENT_USER.role.toLowerCase().includes('guru'); const waliInfo = getMyWaliKelasInfo();
+      let myGuruId = null, filterMapelForm = DB.mapel, jurnalToShow = DB.jurnal;
+      if (isGuru || waliInfo) { const myGuru = DB.guru.find(g => g.nama && g.nama.trim().toLowerCase() === CURRENT_USER.nama.trim().toLowerCase()); if (myGuru) { myGuruId = myGuru.id; filterMapelForm = DB.mapel.filter(m => m.id === myGuru.mapelId); jurnalToShow = DB.jurnal.filter(j => j.mapelId === myGuru.mapelId); } else filterMapelForm = []; }
+      return `<div class="card"><h3>📓 Tambah Jurnal Kegiatan</h3><form onsubmit="submitJurnal(event)"><div class="form-grid"><div class="field"><label>Mata Pelajaran</label><select name="mapelId" required>${filterMapelForm.map(m => `<option value="${m.id}">${m.nama}</option>`).join('')}</select></div><div class="field"><label>Tanggal</label><input type="date" name="tanggal" required value="${new Date().toISOString().slice(0,10)}"></div><div class="field"><label>Judul / Materi</label><input name="judul" required></div><div class="field" style="grid-column:1/-1"><label>Isi Jurnal</label><textarea name="isi" required></textarea></div></div><div class="btn-row"><button class="btn btn-primary" type="submit">💾 Simpan Jurnal</button><button class="btn btn-danger" type="button" onclick="cetakPDFJurnal()">🖨️ Cetak PDF Jurnal</button></div></form></div><div class="card"><h3>📋 Daftar Jurnal ${isGuru ? 'Mapel Anda' : 'Semua'}</h3><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Mapel</th><th>Judul</th><th>Aksi</th></tr></thead><tbody>${jurnalToShow.map(j => `<tr><td>${formatTanggalIndo(j.tanggal)}</td><td>${esc(nMapel(j.mapelId))}</td><td>${esc(j.judul)}</td><td><button class="btn btn-danger btn-sm" onclick="deleteData('jurnal','${j.id}')">Hapus</button></td></tr>`).join('') || '<tr><td colspan="4" class="empty">Belum ada jurnal</td></tr>'}</tbody></table></div></div>`;
     }
 
     async function submitJurnal(e) {
-      e.preventDefault();
-      const data = Object.fromEntries(new FormData(e.target).entries());
-      data.jenis = 'Kegiatan';
+      e.preventDefault(); const data = Object.fromEntries(new FormData(e.target).entries()); data.jenis = 'Kegiatan';
       showLoading('Menyimpan...');
-      try {
-        const res = await apiCall('create', 'jurnal', { data });
-        DB.jurnal.push(res.data);
-        toast('Jurnal disimpan'); navigate('jurnal');
-      } catch (err) { toast(err.message, 'error'); } finally { hideLoading(); }
+      try { const res = await apiCall('create', 'jurnal', { data }); DB.jurnal.push(res.data); toast('Jurnal disimpan'); navigate('jurnal'); } catch (err) { toast(err.message, 'error'); } finally { hideLoading(); }
     }
 
-    // ==========================================
-    // NILAI & ABSENSI LOGIC
-    // ==========================================
-    window.muatTabelNilai = () => {
-      const mapelId = document.getElementById('inpMapel').value;
-      const kelasId = document.getElementById('inpKelas').value;
-      const semester = document.getElementById('inpSem').value;
-      const jmlHarian = parseInt(document.getElementById('inpHarianCount').value);
-      const siswaList = DB.siswa.filter(s => s.kelasId === kelasId);
-      if (siswaList.length === 0) return document.getElementById('tabelNilaiContainer').innerHTML = '<div class="card"><p class="empty" style="text-align:center;">Tidak ada siswa.</p></div>';
-
-      let tableHtml = `<div class="card"><h3>Daftar Nilai: ${nMapel(mapelId)} - ${nKelas(kelasId)}</h3><div class="table-wrap"><table><thead><tr><th>Nama Siswa</th>${Array.from({length: jmlHarian}, (_, i) => `<th>H${i+1}</th>`).join('')}<th>UTS</th><th>UAS</th><th>Akhir</th></tr></thead><tbody>`;
-      siswaList.forEach(siswa => {
-        const existing = DB.nilai.find(n => n.siswaId === siswa.id && n.mapelId === mapelId && n.semester === semester && n.tahunAjaran === TAHUN_AJARAN_AKTIF);
-        let harianArr = existing && existing.harian ? String(existing.harian).split(',').map(Number) : [];
-        const uts = existing && existing.uts ? existing.uts : '';
-        const uas = existing && existing.uas ? existing.uas : '';
-        tableHtml += `<tr data-siswa="${siswa.id}" data-nilai-id="${existing ? existing.id : ''}"><td>${siswa.nama}</td>`;
-        for (let i = 0; i < jmlHarian; i++) tableHtml += `<td><input type="number" class="nilai-input inp-nilai" data-type="harian" value="${harianArr[i] !== undefined ? harianArr[i] : ''}"></td>`;
-        tableHtml += `<td><input type="number" class="nilai-input inp-nilai" data-type="uts" value="${uts}"></td><td><input type="number" class="nilai-input inp-nilai" data-type="uas" value="${uas}"></td><td><b class="nilai-akhir-text">-</b></td></tr>`;
-      });
-      tableHtml += `</tbody></table></div><div class="btn-row"><button class="btn btn-success" onclick="simpanSemuaNilai('${mapelId}', '${kelasId}', '${semester}')">💾 Simpan Nilai (Bulk)</button></div></div>`;
-      document.getElementById('tabelNilaiContainer').innerHTML = tableHtml;
-      document.querySelectorAll('.inp-nilai').forEach(inp => inp.addEventListener('input', (e) => hitungNilaiAkhirRow(e.target.closest('tr'))));
-      document.querySelectorAll('#tabelNilaiContainer tbody tr').forEach(tr => hitungNilaiAkhirRow(tr));
-    };
-
-    function hitungNilaiAkhirRow(tr) {
-      let totalHarian = 0, countHarian = 0, uts = 0, uas = 0;
-      tr.querySelectorAll('.inp-nilai').forEach(inp => {
-        const val = parseFloat(inp.value) || 0;
-        if (inp.dataset.type === 'harian') { totalHarian += val; countHarian++; }
-        else if (inp.dataset.type === 'uts') uts = val;
-        else if (inp.dataset.type === 'uas') uas = val;
-      });
-      tr.querySelector('.nilai-akhir-text').textContent = Math.round((((countHarian > 0 ? totalHarian / countHarian : 0) + uts + uas) / 3) * 100) / 100;
-    }
-
-    window.simpanSemuaNilai = async (mapelId, kelasId, semester) => {
-      const rows = document.querySelectorAll('#tabelNilaiContainer tbody tr');
-      showLoading('Menyimpan...'); 
-      const payload = [];
-      for (const tr of rows) {
-        const siswaId = tr.dataset.siswa, nilaiId = tr.dataset.nilaiId;
-        let harianArr = [], uts = 0, uas = 0;
-        tr.querySelectorAll('.inp-nilai').forEach(inp => {
-          if (inp.dataset.type === 'harian') harianArr.push(inp.value === '' ? 0 : Number(inp.value));
-          else if (inp.dataset.type === 'uts') uts = inp.value === '' ? 0 : Number(inp.value);
-          else if (inp.dataset.type === 'uas') uas = inp.value === '' ? 0 : Number(inp.value);
-        });
-        payload.push({ id: nilaiId, siswaId, mapelId, semester, tahunAjaran: TAHUN_AJARAN_AKTIF, harian: harianArr.join(','), uts, uas });
-      }
-      try {
-        await apiCall('bulkSave', 'nilai', { data: payload });
-        toast('Nilai berhasil disimpan!');
-        const res = await apiCall('getAllData'); DB = { ...DB, ...res.data };
-        muatTabelNilai();
-      } catch (e) { toast(e.message, 'error'); } finally { hideLoading(); }
-    };
-
-   window.muatTabelAbsensi = async () => {
-  const mapelId = document.getElementById('inpAbsenMapel').value;
-  const kelasId = document.getElementById('inpAbsenKelas').value;
-  const tanggal = document.getElementById('inpAbsenTgl').value;
-  
-  if (!mapelId || !kelasId || !tanggal) return toast('Lengkapi data terlebih dahulu.', 'error');
-
-  const siswaList = DB.siswa.filter(s => s.kelasId === kelasId && (!s.status || s.status === 'Aktif'));
-  if (siswaList.length === 0) return document.getElementById('tabelAbsensiContainer').innerHTML = '<div class="card"><p class="empty" style="text-align:center;">Tidak ada siswa aktif di kelas ini.</p></div>';
-
-  showLoading('Menarik data gerbang...');
-
-  let dataGerbang = [];
-  try {
-    const resGerbang = await apiCall('laporan', 'absensiGerbang', { data: { jenis: 'harian', tanggal: tanggal } });
-    if (resGerbang.success && resGerbang.data) {
-      dataGerbang = resGerbang.data;
-      console.log("✅ Data gerbang berhasil diterima:", dataGerbang);
-      
-      if (dataGerbang.length === 0) {
-        alert("⚠️ Server mengembalikan data KOSONG untuk tanggal ini.\nPastikan tanggal di aplikasi sama dengan tanggal scan di gerbang.");
-      }
-    }
-  } catch (e) {
-    console.error("Gagal Fetch Gerbang:", e);
-    alert("⚠️ Gagal menarik data server gerbang. Pastikan Deploy Web App sudah versi terbaru (New Version).");
-  }
-
-  hideLoading();
-
-  let tableHtml = `
-    <div class="card">
-      <h3>Validasi Absensi ${nKelas(kelasId)} - ${nMapel(mapelId)} (${tanggal})</h3>
-      <div class="hint" style="margin-bottom:10px;">💡 Status <b>Hadir</b> otomatis terisi jika siswa sudah scan di gerbang. Guru cukup menyesuaikan jika ada siswa bolos.</div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Nama Siswa</th>
-              <th>Kelas</th>
-              <th>Info Gerbang</th>
-              <th>Status Kelas</th>
-              <th>Keterangan</th>
-            </tr>
-          </thead>
-          <tbody>`;
-
-  siswaList.forEach(siswa => {
-    const existing = DB.absensi.find(a => a.siswaId === siswa.id && a.mapelId === mapelId && a.tanggal === tanggal);
-    
-    // PINTAR: Cocokkan NIS sebagai teks, dan buang spasi
-    const nisSiswa = String(siswa.nis).trim();
-    const scan = dataGerbang.find(g => String(g.nis).trim() === nisSiswa);
-
-    let badgeGerbang = `<span class="badge b-red">Tidak Scan</span>`;
-    if (scan && scan.jamMasuk && scan.jamMasuk !== '-') {
-      // PINTAR: Bersihkan format jam 1899 jika backend belum di-deploy
-      let jamTampil = scan.jamMasuk;
-      if (String(jamTampil).includes('1899-12-30T')) {
-        jamTampil = String(jamTampil).split('T')[1].substring(0, 5); // Ambil "06:36"
-      } else if (String(jamTampil).includes('T')) {
-        jamTampil = new Date(jamTampil).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
-      }
-      badgeGerbang = `<span class="badge b-green">Hadir ${jamTampil}</span>`;
-    }
-
-    let defaultStatus = 'Alfa'; 
-    if (existing) {
-      defaultStatus = existing.status;
-    } else if (scan && scan.jamMasuk && scan.jamMasuk !== '-') {
-      defaultStatus = 'Hadir'; 
-    }
-
-    const ket = existing ? existing.keterangan : '';
-
-    tableHtml += `
-      <tr data-siswa="${siswa.id}" data-absen-id="${existing ? existing.id : ''}">
-        <td><b>${esc(siswa.nama)}</b><br><span style="font-size:.72rem;color:var(--muted);">${esc(siswa.nis)}</span></td>
-        <td><span class="badge b-blue">${esc(nKelas(siswa.kelasId))}</span></td>
-        <td>${badgeGerbang}</td>
-        <td>
-          <select class="inp-absen-status" style="width:100px;">
-            <option value="Hadir" ${defaultStatus==='Hadir'?'selected':''}>Hadir</option>
-            <option value="Sakit" ${defaultStatus==='Sakit'?'selected':''}>Sakit</option>
-            <option value="Izin" ${defaultStatus==='Izin'?'selected':''}>Izin</option>
-            <option value="Alfa" ${defaultStatus==='Alfa'?'selected':''}>Alfa</option>
-          </select>
-        </td>
-        <td><input type="text" class="inp-absen-ket" value="${esc(ket)}" placeholder="Opsional"></td>
-      </tr>`;
-  });
-
-  tableHtml += `
-          </tbody>
-        </table>
-      </div>
-      <div class="btn-row">
-        <button class="btn btn-success" onclick="simpanSemuaAbsensi('${mapelId}', '${tanggal}')">💾 Validasi & Simpan Absensi</button>
-      </div>
-    </div>`;
-
-  document.getElementById('tabelAbsensiContainer').innerHTML = tableHtml;
-};
-    window.simpanSemuaAbsensi = async (mapelId, tanggal) => {
-      const rows = document.querySelectorAll('#tabelAbsensiContainer tbody tr');
-      showLoading('Menyimpan...'); 
-      const payload = [];
-      for (const tr of rows) {
-        const siswaId = tr.dataset.siswa, absenId = tr.dataset.absenId;
-        const status = tr.querySelector('.inp-absen-status').value;
-        const keterangan = tr.querySelector('.inp-absen-ket').value;
-        payload.push({ id: absenId, siswaId, mapelId, tanggal, status, keterangan });
-      }
-      try {
-        await apiCall('bulkSave', 'absensi', { data: payload });
-        toast('Absensi berhasil divalidasi & disimpan!');
-        const res = await apiCall('getAllData'); DB = { ...DB, ...res.data };
-        muatTabelAbsensi();
-      } catch (e) { toast(e.message, 'error'); } finally { hideLoading(); }
-    };
-
-    window.renderRekapAbsensi = () => {
-      const kelasId = document.getElementById('rekapAbsenKelas').value;
-      const mapelId = document.getElementById('rekapAbsenMapel').value;
-      const siswaList = DB.siswa.filter(s => s.kelasId === kelasId);
-      const absensiMapel = DB.absensi.filter(a => a.mapelId === mapelId && siswaList.some(s => s.id === a.siswaId));
-      const tanggalList = [...new Set(absensiMapel.map(a => a.tanggal))].sort();
-      if (tanggalList.length === 0) return document.getElementById('rekapAbsenContainer').innerHTML = '<p class="empty" style="text-align:center;">Belum ada data absensi.</p>';
-
-      let tableHtml = `<div class="table-wrap"><table><thead><tr><th>Nama Siswa</th>${tanggalList.map(t => `<th>${t.split('-').reverse().join('/')}</th>`).join('')}</tr></thead><tbody>`;
-      siswaList.forEach(siswa => {
-        tableHtml += `<tr><td><b>${siswa.nama}</b></td>`;
-        tanggalList.forEach(tgl => {
-          const record = DB.absensi.find(a => a.siswaId === siswa.id && a.mapelId === mapelId && a.tanggal === tgl);
-          let badge = '-';
-          if (record) {
-            const color = record.status === 'Hadir' ? 'b-green' : record.status === 'Alfa' ? 'b-red' : 'b-yellow';
-            badge = `<span class="badge ${color}">${record.status.charAt(0)}</span>`;
-          }
-          tableHtml += `<td style="text-align:center;">${badge}</td>`;
-        });
-        tableHtml += `</tr>`;
-      });
-      tableHtml += `</tbody></table></div><div class="hint" style="margin-top:10px;">Keterangan: H=Hadir, S=Sakit, I=Izin, A=Alfa</div>`;
-      document.getElementById('rekapAbsenContainer').innerHTML = tableHtml;
-    };
-
-    // ==========================================
-    // HALAMAN ADMIN & AGENDA
-    // ==========================================
     function renderAdmin() {
-      return `
-        <div class="card">
-          <h3>⚙️ Pengaturan Identitas & Sistem</h3>
-          <form onsubmit="simpanPengaturan(event)">
-            <div class="form-grid">
-              <div class="field"><label>Nama Yayasan</label><input name="namaYayasan" value="${getVal('namaYayasan', '')}"></div>
-              <div class="field"><label>Nama Sekolah</label><input name="namaSekolah" value="${getVal('namaSekolah', '')}"></div>
-              <div class="field"><label>Akreditasi</label><input name="akreditasi" value="${getVal('akreditasi', '')}"></div>
-              <div class="field"><label>Alamat Lengkap</label><input name="alamat" value="${getVal('alamat', '')}"></div>
-              <div class="field"><label>Kontak</label><input name="kontak" value="${getVal('kontak', '')}"></div>
-              <div class="field"><label>Nama Kepala Sekolah</label><input name="kepsek" value="${getVal('kepsek', '')}"></div>
-              <div class="field"><label>Tahun Ajaran Aktif</label><input name="tahunAjaranAktif" value="${TAHUN_AJARAN_AKTIF}"></div>
-            </div>
-            <div class="btn-row"><button class="btn btn-primary" type="submit">💾 Simpan Pengaturan</button></div>
-          </form>
-        </div>`;
+      return `<div class="card"><h3>⚙️ Pengaturan Identitas & Sistem</h3><form onsubmit="simpanPengaturan(event)"><div class="form-grid"><div class="field"><label>Nama Yayasan</label><input name="namaYayasan" value="${getVal('namaYayasan', '')}"></div><div class="field"><label>Nama Sekolah</label><input name="namaSekolah" value="${getVal('namaSekolah', '')}"></div><div class="field"><label>Akreditasi</label><input name="akreditasi" value="${getVal('akreditasi', '')}"></div><div class="field"><label>Alamat Lengkap</label><input name="alamat" value="${getVal('alamat', '')}"></div><div class="field"><label>Kontak</label><input name="kontak" value="${getVal('kontak', '')}"></div><div class="field"><label>Nama Kepala Sekolah</label><input name="kepsek" value="${getVal('kepsek', '')}"></div><div class="field"><label>Tahun Ajaran Aktif</label><input name="tahunAjaranAktif" value="${TAHUN_AJARAN_AKTIF}"></div></div><div class="btn-row"><button class="btn btn-primary" type="submit">💾 Simpan Pengaturan</button></div></form></div>`;
     }
 
     window.simpanPengaturan = async (e) => {
-      e.preventDefault();
-      const data = Object.fromEntries(new FormData(e.target).entries());
+      e.preventDefault(); const data = Object.fromEntries(new FormData(e.target).entries());
       showLoading('Menyimpan pengaturan...');
       for (const [key, value] of Object.entries(data)) {
         const existing = DB.pengaturan.find(p => p.key === key);
-        if (existing) {
-          if (existing.value !== value) {
-            await apiCall('update', 'pengaturan', { id: existing.id, data: { value } });
-            existing.value = value; 
-          }
-        } else {
-          const res = await apiCall('create', 'pengaturan', { data: { key, value } });
-          DB.pengaturan.push(res.data);
-        }
+        if (existing) { if (existing.value !== value) { await apiCall('update', 'pengaturan', { id: existing.id, data: { value } }); existing.value = value; } } 
+        else { const res = await apiCall('create', 'pengaturan', { data: { key, value } }); DB.pengaturan.push(res.data); }
       }
       TAHUN_AJARAN_AKTIF = getVal('tahunAjaranAktif', TAHUN_AJARAN_AKTIF);
       hideLoading(); toast('Pengaturan disimpan!'); navigate('administrasi');
     };
-window.editJadwal = (id) => {
-  editJadwalId = id;
-  activateSubTab('jadwal');
-};
-window.generateJadwalOtomatis = async () => {
-  if (!confirm('⚠️ PERINGATAN!\n\nIni akan MENGHAPUS semua jadwal yang ada saat ini dan membuat jadwal baru secara otomatis.\n\nApakah Anda yakin?')) return;
-  
-  // Siapkan slot jam (8 jam pelajaran)
-  const timeSlots = [
-    { mulai: '07:00', selesai: '07:40' },
-    { mulai: '07:40', selesai: '08:20' },
-    { mulai: '08:20', selesai: '09:00' },
-    { mulai: '09:20', selesai: '10:00' },
-    { mulai: '10:00', selesai: '10:40' },
-    { mulai: '11:00', selesai: '11:40' },
-    { mulai: '11:40', selesai: '12:20' },
-    { mulai: '13:00', selesai: '13:40' }
-  ];
-  const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-  
-  let teacherBusy = {}; // Mencegah guru mengajar 2 kelas di jam sama
-  let newJadwal = [];
-  
-  // Acak urutan kelas agar jadwal tidak monoton
-  const shuffledKelas = [...DB.kelas].sort(() => Math.random() - 0.5);
 
-  days.forEach(hari => {
-    timeSlots.forEach(slot => {
-      shuffledKelas.forEach(kelas => {
-        // Cari guru yang mengajar di kelas ini
-        let eligibleGurus = DB.guru.filter(g => {
-          const kelasIds = String(g.kelasIds || '').split(',');
-          return kelasIds.includes(kelas.id);
-        });
-        
-        // Acak guru agar mata pelajarannya bervariasi
-        eligibleGurus.sort(() => Math.random() - 0.5);
-        
-        let assigned = false;
-        for (let guru of eligibleGurus) {
-          const key = `${guru.id}_${hari}_${slot.mulai}`;
-          if (!teacherBusy[key]) {
-            teacherBusy[key] = true; // Kunci guru ini di jam tersebut
-            newJadwal.push({
-              hari: hari,
-              jamMulai: slot.mulai,
-              jamSelesai: slot.selesai,
-              kelasId: kelas.id,
-              mapelId: guru.mapelId,
-              guruId: guru.id
-            });
-            assigned = true;
-            break;
-          }
-        }
-        
-        // Jika tidak ada guru yang tersedia untuk kelas ini di jam tersebut, biarkan kosong
-        if (!assigned) {
-          newJadwal.push({
-            hari: hari,
-            jamMulai: slot.mulai,
-            jamSelesai: slot.selesai,
-            kelasId: kelas.id,
-            mapelId: '',
-            guruId: ''
-          });
-        }
-      });
-    });
-  });
-
-  showLoading('Menghapus jadwal lama & menyimpan jadwal baru...');
-  try {
-    // 1. Hapus semua jadwal lama di Spreadsheet
-    await apiCall('clearSheet', 'jadwal');
-    
-    // 2. Simpan semua jadwal baru sekaligus
-    await apiCall('bulkSave', 'jadwal', { data: newJadwal });
-    
-    toast('Jadwal otomatis berhasil dibuat!');
-    
-    // Refresh data aplikasi
-    const res = await apiCall('getAllData'); DB = { ...DB, ...res.data };
-    activateSubTab('jadwal');
-  } catch (e) {
-    toast(e.message, 'error');
-  } finally {
-    hideLoading();
-  }
-};
-window.submitJadwal = async (e) => {
-  e.preventDefault();
-  const data = Object.fromEntries(new FormData(e.target).entries());
-  const id = data.id;
-  delete data.id;
-  
-  showLoading('Menyimpan jadwal...');
-  try {
-    if (id) {
-      // Proses Update
-      await apiCall('update', 'jadwal', { id: id, data: data });
-      const idx = DB.jadwal.findIndex(x => x.id === id);
-      if (idx > -1) DB.jadwal[idx] = { id, ...data };
-      toast('Jadwal berhasil diupdate!');
-    } else {
-      // Proses Create Baru
-      const res = await apiCall('create', 'jadwal', { data: data });
-      DB.jadwal.push(res.data);
-      toast('Jadwal baru berhasil disimpan!');
-    }
-    editJadwalId = null;
-    activateSubTab('jadwal'); // Refresh tabel
-  } catch (err) { 
-    toast(err.message, 'error'); 
-  } finally { 
-    hideLoading(); 
-  }
-};
     function renderAgenda() {
-  const isAdmin = CURRENT_USER.role.toLowerCase().includes('admin');
-  let formHtml = '';
+      const isAdmin = CURRENT_USER.role.toLowerCase().includes('admin'); let formHtml = '';
+      if (isAdmin) { formHtml = `<div class="card"><h3>🗓️ Tambah Agenda Sekolah (Admin)</h3><form onsubmit="submitAgenda(event)"><div class="form-grid"><div class="field"><label>Nama Kegiatan</label><input name="nama" placeholder="Contoh: Rapat Orang Tua Murid" required></div><div class="field"><label>Tanggal Mulai</label><input type="date" name="tanggalMulai" required value="${new Date().toISOString().slice(0,10)}"></div><div class="field"><label>Tanggal Selesai</label><input type="date" name="tanggalSelesai" required value="${new Date().toISOString().slice(0,10)}"></div></div><div class="btn-row"><button class="btn btn-primary" type="submit">💾 Simpan Agenda</button></div></form></div>`; }
+      const agendaUrut = [...DB.agenda].sort((a, b) => String(a.tanggalMulai).localeCompare(String(b.tanggalMulai)));
+      return `${formHtml}<div class="card"><h3>📅 Daftar Agenda Sekolah</h3><div class="table-wrap"><table><thead><tr><th style="width: 50px; text-align:center;">No</th><th>Tanggal Mulai</th><th>Tanggal Selesai</th><th>Nama Kegiatan</th>${isAdmin ? '<th style="width: 100px; text-align:center;">Aksi</th>' : ''}</tr></thead><tbody>${agendaUrut.map((a, i) => `<tr><td style="text-align:center;">${i+1}</td><td>${formatTanggalIndo(a.tanggalMulai)}</td><td>${formatTanggalIndo(a.tanggalSelesai)}</td><td><b>${esc(a.nama)}</b></td>${isAdmin ? `<td style="text-align:center;"><button class="btn btn-danger btn-sm" onclick="deleteData('agenda','${a.id}')">Hapus</button></td>` : ''}</tr>`).join('') || `<tr><td colspan="${isAdmin ? 5 : 4}" class="empty" style="text-align:center;">Belum ada agenda sekolah.</td></tr>`}</tbody></table></div></div>`;
+    }
 
-  // Form input HANYA muncul untuk Admin
-  if (isAdmin) {
-    formHtml = `
-      <div class="card">
-        <h3>🗓️ Tambah Agenda Sekolah (Admin)</h3>
-        <form onsubmit="submitAgenda(event)">
-          <div class="form-grid">
-            <div class="field"><label>Nama Kegiatan</label><input name="nama" placeholder="Contoh: Rapat Orang Tua Murid" required></div>
-            <div class="field"><label>Tanggal Mulai</label><input type="date" name="tanggalMulai" required value="${new Date().toISOString().slice(0,10)}"></div>
-            <div class="field"><label>Tanggal Selesai</label><input type="date" name="tanggalSelesai" required value="${new Date().toISOString().slice(0,10)}"></div>
-          </div>
-          <div class="btn-row"><button class="btn btn-primary" type="submit">💾 Simpan Agenda</button></div>
-        </form>
-      </div>
-    `;
-  }
+    window.submitAgenda = async (e) => {
+      e.preventDefault(); const data = Object.fromEntries(new FormData(e.target).entries());
+      showLoading('Menyimpan agenda...');
+      try { const res = await apiCall('create', 'agenda', { data }); DB.agenda.push(res.data); toast('Agenda berhasil disimpan!'); navigate('agenda'); } catch (err) { toast(err.message, 'error'); } finally { hideLoading(); }
+    };
 
-  // Urutkan agenda dari tanggal terbaru/terdekat
-  const agendaUrut = [...DB.agenda].sort((a, b) => String(a.tanggalMulai).localeCompare(String(b.tanggalMulai)));
+    function formatTanggalIndo(tglStr) {
+      if (!tglStr) return '-'; const d = new Date(tglStr);
+      if (isNaN(d.getTime())) { const p = String(tglStr).split('-'); if (p.length === 3) return `${p[2]}/${p[1]}/${p[0]}`; return String(tglStr); }
+      return d.toLocaleDateString('id-ID', {day:'2-digit', month:'2-digit', year:'numeric'});
+    }
 
-  return `
-    ${formHtml}
-    <div class="card">
-      <h3>📅 Daftar Agenda Sekolah</h3>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th style="width: 50px; text-align:center;">No</th>
-              <th>Tanggal Mulai</th>
-              <th>Tanggal Selesai</th>
-              <th>Nama Kegiatan</th>
-              ${isAdmin ? '<th style="width: 100px; text-align:center;">Aksi</th>' : ''}
-            </tr>
-          </thead>
-          <tbody>
-            ${agendaUrut.map((a, i) => `
-              <tr>
-                <td style="text-align:center;">${i+1}</td>
-                <td>${esc(a.tanggalMulai)}</td>
-                <td>${esc(a.tanggalSelesai)}</td>
-                <td><b>${esc(a.nama)}</b></td>
-                ${isAdmin ? `<td style="text-align:center;"><button class="btn btn-danger btn-sm" onclick="deleteData('agenda','${a.id}')">Hapus</button></td>` : ''}
-              </tr>
-            `).join('') || `<tr><td colspan="${isAdmin ? 5 : 4}" class="empty" style="text-align:center;">Belum ada agenda sekolah.</td></tr>`}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  `;
-}
-
-    // ==========================================
-    // CETAK PDF MENGGUNAKAN IFRAME (ANTI POPUP)
-    // ==========================================
     window.cetakPDFKasus = () => {
-  try {
-    const isGuru = CURRENT_USER.role.toLowerCase().includes('guru');
-    const waliInfo = getMyWaliKelasInfo();
-    let kasusToPrint = DB.kasus;
-    
-    if (waliInfo) {
-      const siswaIds = DB.siswa.filter(s => s.kelasId === waliInfo.kelasId).map(s => s.id);
-      kasusToPrint = DB.kasus.filter(k => siswaIds.includes(k.siswaId));
-    } else if (isGuru) {
-      const myGuru = DB.guru.find(g => g.nama && g.nama.trim().toLowerCase() === CURRENT_USER.nama.trim().toLowerCase());
-      if (myGuru) kasusToPrint = DB.kasus.filter(k => k.mapelId === myGuru.mapelId);
-    }
+      try {
+        const isGuru = CURRENT_USER.role.toLowerCase().includes('guru'); const waliInfo = getMyWaliKelasInfo(); let kasusToPrint = DB.kasus;
+        if (waliInfo) { const siswaIds = DB.siswa.filter(s => s.kelasId === waliInfo.kelasId).map(s => s.id); kasusToPrint = DB.kasus.filter(k => siswaIds.includes(k.siswaId)); } 
+        else if (isGuru) { const myGuru = DB.guru.find(g => g.nama && g.nama.trim().toLowerCase() === CURRENT_USER.nama.trim().toLowerCase()); if (myGuru) kasusToPrint = DB.kasus.filter(k => k.mapelId === myGuru.mapelId); }
+        const rows = kasusToPrint.map((k, i) => `<tr><td style="text-align:center;">${i+1}</td><td>${formatTanggalIndo(k.tanggal)}</td><td>${nSiswa(k.siswaId)}</td><td>${nMapel(k.mapelId)}</td><td>${k.judul}</td><td>${k.deskripsi || '-'}</td></tr>`).join('');
+        const html = `<html><head><title>Cetak Kasus</title><style>body{font-family:sans-serif;padding:30px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:8px;} th{background:#eee;}</style></head><body>${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">LAPORAN CATATAN KASUS</h3><table><thead><tr><th>No</th><th>Tanggal</th><th>Siswa</th><th>Mapel</th><th>Judul</th><th>Deskripsi</th></tr></thead><tbody>${rows}</tbody></table>${getTandaTangan('guru')}</body></html>`;
+        printHTML(html);
+      } catch (e) { alert("Error cetak: " + e.message); }
+    };
 
-    // Gunakan formatTanggalIndo di sini
-    const rows = kasusToPrint.map((k, i) => `<tr><td style="text-align:center;">${i+1}</td><td>${formatTanggalIndo(k.tanggal)}</td><td>${nSiswa(k.siswaId)}</td><td>${nMapel(k.mapelId)}</td><td>${k.judul}</td><td>${k.deskripsi || '-'}</td></tr>`).join('');
-    
-    const html = `<html><head><title>Cetak Kasus</title><style>body{font-family:sans-serif;padding:30px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:8px;} th{background:#eee;}</style></head><body>${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">LAPORAN CATATAN KASUS</h3><table><thead><tr><th>No</th><th>Tanggal</th><th>Siswa</th><th>Mapel</th><th>Judul</th><th>Deskripsi</th></tr></thead><tbody>${rows}</tbody></table>${getTandaTangan('guru')}</body></html>`;
-    
-    printHTML(html);
-  } catch (e) { alert("Error cetak: " + e.message); }
-};
     window.cetakPDFJurnal = () => {
-  try {
-    const isGuru = CURRENT_USER.role.toLowerCase().includes('guru');
-    let jurnalToPrint = DB.jurnal;
-    if (isGuru) {
-      const myGuru = DB.guru.find(g => g.nama && g.nama.trim().toLowerCase() === CURRENT_USER.nama.trim().toLowerCase());
-      if (myGuru) jurnalToPrint = DB.jurnal.filter(j => j.mapelId === myGuru.mapelId);
-    }
-
-    // Gunakan formatTanggalIndo di sini
-    const rows = jurnalToPrint.map((j, i) => `<tr><td style="text-align:center;">${i+1}</td><td>${formatTanggalIndo(j.tanggal)}</td><td>${nMapel(j.mapelId)}</td><td>${j.judul}</td><td>${j.isi || '-'}</td></tr>`).join('');
-    
-    const html = `<html><head><title>Cetak Jurnal</title><style>body{font-family:sans-serif;padding:30px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:8px;} th{background:#eee;}</style></head><body>${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">LAPORAN JURNAL KEGIATAN</h3><table><thead><tr><th>No</th><th>Tanggal</th><th>Mapel</th><th>Judul</th><th>Isi Jurnal</th></tr></thead><tbody>${rows}</tbody></table>${getTandaTangan('guru')}</body></html>`;
-    
-    printHTML(html);
-  } catch (e) { alert("Error cetak: " + e.message); }
-};
+      try {
+        const isGuru = CURRENT_USER.role.toLowerCase().includes('guru'); let jurnalToPrint = DB.jurnal;
+        if (isGuru) { const myGuru = DB.guru.find(g => g.nama && g.nama.trim().toLowerCase() === CURRENT_USER.nama.trim().toLowerCase()); if (myGuru) jurnalToPrint = DB.jurnal.filter(j => j.mapelId === myGuru.mapelId); }
+        const rows = jurnalToPrint.map((j, i) => `<tr><td style="text-align:center;">${i+1}</td><td>${formatTanggalIndo(j.tanggal)}</td><td>${nMapel(j.mapelId)}</td><td>${j.judul}</td><td>${j.isi || '-'}</td></tr>`).join('');
+        const html = `<html><head><title>Cetak Jurnal</title><style>body{font-family:sans-serif;padding:30px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:8px;} th{background:#eee;}</style></head><body>${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">LAPORAN JURNAL KEGIATAN</h3><table><thead><tr><th>No</th><th>Tanggal</th><th>Mapel</th><th>Judul</th><th>Isi Jurnal</th></tr></thead><tbody>${rows}</tbody></table>${getTandaTangan('guru')}</body></html>`;
+        printHTML(html);
+      } catch (e) { alert("Error cetak: " + e.message); }
+    };
 
     window.cetakPDFAbsensi = () => {
-  try {
-    const kelasId = document.getElementById('rekapAbsenKelas').value;
-    const mapelId = document.getElementById('rekapAbsenMapel').value;
-    
-    const now = new Date();
-    const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-    const tanggal = prompt('Masukkan tanggal absensi (YYYY-MM-DD):', today);
-    if (!tanggal) return;
+      try {
+        const kelasId = document.getElementById('rekapAbsenKelas').value; const mapelId = document.getElementById('rekapAbsenMapel').value;
+        const now = new Date(); const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+        const tanggal = prompt('Masukkan tanggal absensi (YYYY-MM-DD):', today); if (!tanggal) return;
+        const siswaList = DB.siswa.filter(s => s.kelasId === kelasId); let rows = '', tH = 0, tS = 0, tI = 0, tA = 0;
+        siswaList.forEach((siswa, idx) => {
+          const absen = DB.absensi.find(a => a.siswaId === siswa.id && a.mapelId === mapelId && a.tanggal === tanggal);
+          const status = absen ? absen.status : 'Alfa'; const ket = absen ? (absen.keterangan || '-') : 'Belum diabsen';
+          if (status === 'Hadir') tH++; else if (status === 'Sakit') tS++; else if (status === 'Izin') tI++; else tA++;
+          rows += `<tr><td style="text-align:center;">${idx+1}</td><td>${siswa.nis}</td><td>${siswa.nama}</td><td style="text-align:center;">${status}</td><td>${ket}</td></tr>`;
+        });
+        const tanggalTeks = formatTanggalIndo(tanggal);
+        const html = `<html><head><title>Absensi Harian</title><style>body{font-family:sans-serif;padding:30px; font-size:12px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:8px;} th{background:#eee;}</style></head><body>${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">LAPORAN ABSENSI HARIAN</h3><p style="text-align:center; margin-bottom:20px;">Kelas: ${nKelas(kelasId)} - Mapel: ${nMapel(mapelId)} • Tanggal: ${tanggalTeks}</p><table><thead><tr><th>No</th><th>NIS</th><th>Nama</th><th>Status</th><th>Keterangan</th></tr></thead><tbody>${rows}</tbody></table><div style="margin-top:20px;"><strong>Rekap:</strong> Hadir: ${tH} • Sakit: ${tS} • Izin: ${tI} • Alfa: ${tA} • Total: ${siswaList.length}</div>${getTandaTangan('guru', mapelId)}</body></html>`;
+        printHTML(html);
+      } catch (e) { alert("Error cetak: " + e.message); }
+    };
 
-    const siswaList = DB.siswa.filter(s => s.kelasId === kelasId);
-    let rows = '', tH = 0, tS = 0, tI = 0, tA = 0;
-    
-    siswaList.forEach((siswa, idx) => {
-      const absen = DB.absensi.find(a => a.siswaId === siswa.id && a.mapelId === mapelId && a.tanggal === tanggal);
-      const status = absen ? absen.status : 'Alfa';
-      const ket = absen ? (absen.keterangan || '-') : 'Belum diabsen';
-      if (status === 'Hadir') tH++; else if (status === 'Sakit') tS++; else if (status === 'Izin') tI++; else tA++;
-      rows += `<tr><td style="text-align:center;">${idx+1}</td><td>${siswa.nis}</td><td>${siswa.nama}</td><td style="text-align:center;">${status}</td><td>${ket}</td></tr>`;
-    });
-
-    // Rapikan format tanggal di judul
-    const tanggalTeks = formatTanggalIndo(tanggal);
-
-    const html = `<html><head><title>Absensi Harian</title><style>body{font-family:sans-serif;padding:30px; font-size:12px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:8px;} th{background:#eee;}</style></head><body>${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">LAPORAN ABSENSI HARIAN</h3><p style="text-align:center; margin-bottom:20px;">Kelas: ${nKelas(kelasId)} - Mapel: ${nMapel(mapelId)} • Tanggal: ${tanggalTeks}</p><table><thead><tr><th>No</th><th>NIS</th><th>Nama</th><th>Status</th><th>Keterangan</th></tr></thead><tbody>${rows}</tbody></table><div style="margin-top:20px;"><strong>Rekap:</strong> Hadir: ${tH} • Sakit: ${tS} • Izin: ${tI} • Alfa: ${tA} • Total: ${siswaList.length}</div>${getTandaTangan('guru', mapelId)}</body></html>`;
-    
-    printHTML(html);
-  } catch (e) { alert("Error cetak: " + e.message); }
-};
     window.cetakPDFNilai = () => {
       try {
-        const mapelId = document.getElementById('inpMapel').value;
-        const kelasId = document.getElementById('inpKelas').value;
-        const semester = document.getElementById('inpSem').value;
-        const jmlHarian = parseInt(document.getElementById('inpHarianCount').value);
-        const siswaList = DB.siswa.filter(s => s.kelasId === kelasId);
-        let tableRows = '';
-
+        const mapelId = document.getElementById('inpMapel').value; const kelasId = document.getElementById('inpKelas').value; const semester = document.getElementById('inpSem').value; const jmlHarian = parseInt(document.getElementById('inpHarianCount').value);
+        const siswaList = DB.siswa.filter(s => s.kelasId === kelasId); let tableRows = '';
         siswaList.forEach((siswa, idx) => {
           const existing = DB.nilai.find(n => n.siswaId === siswa.id && n.mapelId === mapelId && n.semester === semester && n.tahunAjaran === TAHUN_AJARAN_AKTIF);
-          let harianArr = existing && existing.harian ? String(existing.harian).split(',').map(Number) : [];
-          const uts = existing ? existing.uts : 0, uas = existing ? existing.uas : 0, akhir = existing ? nilaiAkhir(existing) : 0;
+          let harianArr = existing && existing.harian ? String(existing.harian).split(',').map(Number) : []; const uts = existing ? existing.uts : 0, uas = existing ? existing.uas : 0, akhir = existing ? nilaiAkhir(existing) : 0;
           tableRows += `<tr><td style="text-align:center;">${idx+1}</td><td>${siswa.nama}</td>${Array.from({length: jmlHarian}).map((_, i) => `<td style="text-align:center;">${harianArr[i] || '-'}</td>`).join('')}<td style="text-align:center;">${uts||'-'}</td><td style="text-align:center;">${uas||'-'}</td><td style="text-align:center;"><b>${akhir}</b></td></tr>`;
         });
-
         const html = `<html><head><title>Cetak Nilai</title><style>body{font-family:sans-serif;padding:30px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:8px;} th{background:#eee;}</style></head><body>${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">LAPORAN NILAI SISWA</h3><p style="text-align:center; margin-bottom:20px;">Mapel: ${nMapel(mapelId)} | Kelas: ${nKelas(kelasId)} | Semester: ${semester} | TA: ${TAHUN_AJARAN_AKTIF}</p><table><thead><tr><th>No</th><th>Nama Siswa</th>${Array.from({length: jmlHarian}).map((_, i) => `<th>H${i+1}</th>`).join('')}<th>UTS</th><th>UAS</th><th>Akhir</th></tr></thead><tbody>${tableRows}</tbody></table>${getTandaTangan('guru', mapelId)}</body></html>`;
-        
         printHTML(html);
       } catch (e) { alert("Error cetak: " + e.message); }
     };
 
     window.cetakRekapNilaiSemesteran = () => {
       try {
-        const waliInfo = getMyWaliKelasInfo();
-        if (!waliInfo) return alert('Anda bukan Wali Kelas.');
-
-        const semester = prompt('Masukkan Semester (Ganjil/Genap):', 'Ganjil');
-        if (!semester) return;
-
-        const siswaList = DB.siswa.filter(s => s.kelasId === waliInfo.kelasId);
-        const mapelList = DB.mapel;
-        
+        const waliInfo = getMyWaliKelasInfo(); if (!waliInfo) return alert('Anda bukan Wali Kelas.');
+        const semester = prompt('Masukkan Semester (Ganjil/Genap):', 'Ganjil'); if (!semester) return;
+        const siswaList = DB.siswa.filter(s => s.kelasId === waliInfo.kelasId); const mapelList = DB.mapel;
         let studentScores = siswaList.map(siswa => {
-          let total = 0;
-          let mapelScores = mapelList.map(m => {
-            const n = DB.nilai.find(x => x.siswaId === siswa.id && x.mapelId === m.id && x.semester === semester && x.tahunAjaran === TAHUN_AJARAN_AKTIF);
-            const val = n ? nilaiAkhir(n) : 0; 
-            total += val;
-            return { val, hasScore: !!n };
-          });
-          let avg = mapelList.length > 0 ? (total / mapelList.length) : 0;
-          return { siswa, total, avg, mapelScores };
+          let total = 0; let mapelScores = mapelList.map(m => { const n = DB.nilai.find(x => x.siswaId === siswa.id && x.mapelId === m.id && x.semester === semester && x.tahunAjaran === TAHUN_AJARAN_AKTIF); const val = n ? nilaiAkhir(n) : 0; total += val; return { val, hasScore: !!n }; });
+          let avg = mapelList.length > 0 ? (total / mapelList.length) : 0; return { siswa, total, avg, mapelScores };
         });
-
         studentScores.sort((a, b) => b.avg - a.avg);
-
         let tableRows = '';
         studentScores.forEach((item, idx) => {
           let nilaiHtml = item.mapelScores.map(ms => `<td style="text-align:center;">${ms.hasScore ? ms.val : '-'}</td>`).join('');
-          tableRows += `<tr>
-            <td style="text-align:center;">${idx + 1}</td>
-            <td>${item.siswa.nama}</td>
-            ${nilaiHtml}
-            <td style="text-align:center;"><b>${item.total.toFixed(2)}</b></td>
-            <td style="text-align:center;"><b>${item.avg.toFixed(2)}</b></td>
-            <td style="text-align:center;"><b>${idx + 1}</b></td>
-          </tr>`;
+          tableRows += `<tr><td style="text-align:center;">${idx + 1}</td><td>${item.siswa.nama}</td>${nilaiHtml}<td style="text-align:center;"><b>${item.total.toFixed(2)}</b></td><td style="text-align:center;"><b>${item.avg.toFixed(2)}</b></td><td style="text-align:center;"><b>${idx + 1}</b></td></tr>`;
         });
-
-        const html = `
-          <html><head><title>Rekap Nilai Semesteran</title>
-          <style>
-            body{font-family:sans-serif;padding:20px; font-size:11px;} 
-            table{width:100%;border-collapse:collapse;margin-top:20px;} 
-            th,td{border:1px solid #000;padding:6px;} 
-            th{background:#eee;}
-          </style></head>
-          <body>
-            ${getKopSurat()}
-            <h3 style="text-align:center; text-decoration:underline;">REKAP NILAI SEMESTERAN</h3>
-            <p style="text-align:center; margin-bottom:20px;">Kelas: ${waliInfo.kelasNama} | Semester: ${semester} | Tahun Ajaran: ${TAHUN_AJARAN_AKTIF}</p>
-            <table>
-              <thead>
-                <tr>
-                  <th rowspan="2" style="text-align:center; vertical-align:middle;">No</th>
-                  <th rowspan="2" style="vertical-align:middle;">Nama Siswa</th>
-                  <th colspan="${mapelList.length}" style="text-align:center;">Nilai Mata Pelajaran</th>
-                  <th rowspan="2" style="text-align:center; vertical-align:middle;">Jumlah</th>
-                  <th rowspan="2" style="text-align:center; vertical-align:middle;">Rata-rata</th>
-                  <th rowspan="2" style="text-align:center; vertical-align:middle;">Rangking</th>
-                </tr>
-                <tr>
-                  ${mapelList.map(m => `<th style="text-align:center;">${m.kode}</th>`).join('')}
-                </tr>
-              </thead>
-              <tbody>${tableRows}</tbody>
-            </table>
-            ${getTandaTangan('wali')}
-          </body></html>
-        `;
-        
+        const html = `<html><head><title>Rekap Nilai Semesteran</title><style>body{font-family:sans-serif;padding:20px; font-size:11px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:6px;} th{background:#eee;}</style></head><body>${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">REKAP NILAI SEMESTERAN</h3><p style="text-align:center; margin-bottom:20px;">Kelas: ${waliInfo.kelasNama} | Semester: ${semester} | Tahun Ajaran: ${TAHUN_AJARAN_AKTIF}</p><table><thead><tr><th rowspan="2" style="text-align:center; vertical-align:middle;">No</th><th rowspan="2" style="vertical-align:middle;">Nama Siswa</th><th colspan="${mapelList.length}" style="text-align:center;">Nilai Mata Pelajaran</th><th rowspan="2" style="text-align:center; vertical-align:middle;">Jumlah</th><th rowspan="2" style="text-align:center; vertical-align:middle;">Rata-rata</th><th rowspan="2" style="text-align:center; vertical-align:middle;">Rangking</th></tr><tr>${mapelList.map(m => `<th style="text-align:center;">${m.kode}</th>`).join('')}</tr></thead><tbody>${tableRows}</tbody></table>${getTandaTangan('wali')}</body></html>`;
         printHTML(html);
       } catch (e) { alert("Error cetak: " + e.message); }
     };
@@ -1662,96 +813,39 @@ window.submitJadwal = async (e) => {
       try {
         const waliInfo = getMyWaliKelasInfo();
         let targetKelasId = waliInfo ? waliInfo.kelasId : prompt(`Pilih Kelas (ketik nama kelas persis, misal VII A):`, '');
-        
         if (!targetKelasId) return;
-        if (!waliInfo) {
-          const kelas = DB.kelas.find(k => k.nama.toLowerCase() === targetKelasId.trim().toLowerCase());
-          if(!kelas) return alert('Kelas tidak ditemukan');
-          targetKelasId = kelas.id;
-        }
-        
-        const semester = prompt('Masukkan Semester (Ganjil/Genap):', 'Ganjil');
-        if (!semester) return;
-
-        const siswaList = DB.siswa.filter(s => s.kelasId === targetKelasId).sort((a,b) => a.nama.localeCompare(b.nama));
-        const mapelList = DB.mapel;
-        let tableRows = '';
-
+        if (!waliInfo) { const kelas = DB.kelas.find(k => k.nama.toLowerCase() === targetKelasId.trim().toLowerCase()); if(!kelas) return alert('Kelas tidak ditemukan'); targetKelasId = kelas.id; }
+        const semester = prompt('Masukkan Semester (Ganjil/Genap):', 'Ganjil'); if (!semester) return;
+        const siswaList = DB.siswa.filter(s => s.kelasId === targetKelasId).sort((a,b) => a.nama.localeCompare(b.nama)); const mapelList = DB.mapel; let tableRows = '';
         siswaList.forEach((siswa, idx) => {
-          let nilaiHtml = mapelList.map(m => {
-             const n = DB.nilai.find(x => x.siswaId === siswa.id && x.mapelId === m.id && x.semester === semester && x.tahunAjaran === TAHUN_AJARAN_AKTIF);
-             return `<td style="text-align:center;">${n ? nilaiAkhir(n) : '-'}</td>`;
-          }).join('');
-          
-          const yearStart = TAHUN_AJARAN_AKTIF.split('/')[0];
-          const absensi = DB.absensi.filter(a => a.siswaId === siswa.id && String(a.tanggal).startsWith(yearStart));
+          let nilaiHtml = mapelList.map(m => { const n = DB.nilai.find(x => x.siswaId === siswa.id && x.mapelId === m.id && x.semester === semester && x.tahunAjaran === TAHUN_AJARAN_AKTIF); return `<td style="text-align:center;">${n ? nilaiAkhir(n) : '-'}</td>`; }).join('');
+          const yearStart = TAHUN_AJARAN_AKTIF.split('/')[0]; const absensi = DB.absensi.filter(a => a.siswaId === siswa.id && String(a.tanggal).startsWith(yearStart));
           const h = absensi.filter(a => a.status === 'Hadir').length, s = absensi.filter(a => a.status === 'Sakit').length, i = absensi.filter(a => a.status === 'Izin').length, a = absensi.filter(a => a.status === 'Alfa').length;
-          
           tableRows += `<tr><td style="text-align:center;">${idx+1}</td><td>${siswa.nama}</td>${nilaiHtml}<td style="text-align:center;">${h}</td><td style="text-align:center;">${s}</td><td style="text-align:center;">${i}</td><td style="text-align:center;">${a}</td></tr>`;
         });
-
         const html = `<html><head><title>Rekap Rapor</title><style>body{font-family:sans-serif;padding:30px; font-size:12px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:6px;} th{background:#eee;}</style></head><body>${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">REKAP RAPOR SISWA</h3><p style="text-align:center; margin-bottom:20px;">Kelas: ${nKelas(targetKelasId)} | Semester: ${semester} | TA: ${TAHUN_AJARAN_AKTIF}</p><table><thead><tr><th rowspan="2">No</th><th rowspan="2">Nama Siswa</th><th colspan="${mapelList.length}">Nilai Mapel</th><th colspan="4">Absensi</th></tr><tr>${mapelList.map(m => `<th>${m.kode}</th>`).join('')}<th>H</th><th>S</th><th>I</th><th>A</th></tr></thead><tbody>${tableRows}</tbody></table>${getTandaTangan('wali')}</body></html>`;
-        
         printHTML(html);
       } catch (e) { alert("Error cetak: " + e.message); }
     };
 
-    // ==========================================
-    // SUBMIT & DELETE DATA
-    // ==========================================
     async function submitForm(e, entity) {
-      e.preventDefault();
-      const data = Object.fromEntries(new FormData(e.target).entries());
+      e.preventDefault(); const data = Object.fromEntries(new FormData(e.target).entries());
       showLoading('Menyimpan...');
-      try {
-        const res = await apiCall('create', entity, { data });
-        DB[entity].push(res.data); 
-        toast('Data disimpan!'); navigate(entity);
-      } catch (err) { toast(err.message, 'error'); } finally { hideLoading(); }
+      try { const res = await apiCall('create', entity, { data }); DB[entity].push(res.data); toast('Data disimpan!'); navigate(entity); } catch (err) { toast(err.message, 'error'); } finally { hideLoading(); }
     }
 
     async function deleteData(entity, id) {
-  if (!confirm('Apakah Anda yakin ingin menghapus data ini secara permanen?')) return;
-  showLoading('Menghapus...');
-  try {
-    const res = await apiCall('delete', entity, { id: id });
-    if (res.ok || res.success) {
-      // Hapus data dari memori aplikasi
-      DB[entity] = DB[entity].filter(x => x.id !== id); 
-      toast('Data berhasil terhapus');
-      
-      // KUNCI PERBAIKAN: Cek apakah yang dihapus adalah sub-menu
-      if (entity === 'jadwal') {
-        editJadwalId = null; // Reset form edit jadwal jika ada
-        activateSubTab('jadwal'); // Refresh tabel jadwal
-      } else {
-        navigate(entity); // Refresh halaman utama (seperti siswa, guru, kasus)
-      }
-      
-    } else {
-      throw new Error('Server menolak penghapusan');
+      if (!confirm('Apakah Anda yakin ingin menghapus data ini secara permanen?')) return;
+      showLoading('Menghapus...');
+      try {
+        const res = await apiCall('delete', entity, { id: id });
+        if (res.ok || res.success) {
+          DB[entity] = DB[entity].filter(x => x.id !== id); toast('Data berhasil terhapus');
+          if (entity === 'jadwal') { editJadwalId = null; activateSubTab('jadwal'); } else { navigate(entity); }
+        } else throw new Error('Server menolak penghapusan');
+      } catch (err) { alert('Gagal menghapus: ' + err.message); } finally { hideLoading(); }
     }
-  } catch (err) { 
-    alert('Gagal menghapus: ' + err.message); 
-  } finally { 
-    hideLoading(); 
-  }
-}
-window.submitAgenda = async (e) => {
-  e.preventDefault();
-  const data = Object.fromEntries(new FormData(e.target).entries());
-  showLoading('Menyimpan agenda...');
-  try {
-    const res = await apiCall('create', 'agenda', { data });
-    DB.agenda.push(res.data);
-    toast('Agenda berhasil disimpan!'); 
-    navigate('agenda');
-  } catch (err) { 
-    toast(err.message, 'error'); 
-  } finally { 
-    hideLoading(); 
-  }
-};
+
     document.getElementById('loginPassword').addEventListener('keypress', e => { if (e.key === 'Enter') doLogin(); });
     window.doLogin = doLogin; window.doLogout = doLogout; window.navigate = navigate; window.activateSubTab = activateSubTab; window.submitForm = submitForm; window.deleteData = deleteData;
   </script>
