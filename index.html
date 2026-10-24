@@ -1093,49 +1093,63 @@
     };
 
     window.cetakRaporWaliKelas = () => {
-      try {
-        const waliInfo = getMyWaliKelasInfo();
-        let targetKelasId = waliInfo ? waliInfo.kelasId : prompt(`Pilih Kelas (ketik nama kelas persis, misal VII A):`, '');
-        if (!targetKelasId) return;
-        if (!waliInfo) { const kelas = DB.kelas.find(k => k.nama.toLowerCase() === targetKelasId.trim().toLowerCase()); if(!kelas) return alert('Kelas tidak ditemukan'); targetKelasId = kelas.id; }
-        
-        const semester = prompt('Masukkan Semester (Ganjil/Genap):', 'Ganjil'); if (!semester) return;
-        
-        const siswaList = DB.siswa.filter(s => String(s.kelasId).trim() === String(targetKelasId).trim()).sort((a,b) => a.nama.localeCompare(b.nama)); 
-        const mapelList = DB.mapel; 
-        let tableRows = '';
-        
-        const yearStart = String(TAHUN_AJARAN_AKTIF).split('/')[0].trim(); 
+  try {
+    const waliInfo = getMyWaliKelasInfo();
+    let targetKelasId = waliInfo ? waliInfo.kelasId : prompt(`Pilih Kelas (ketik nama kelas persis, misal VII A):`, '');
+    if (!targetKelasId) return;
+    if (!waliInfo) { const kelas = DB.kelas.find(k => k.nama.toLowerCase() === targetKelasId.trim().toLowerCase()); if(!kelas) return alert('Kelas tidak ditemukan'); targetKelasId = kelas.id; }
+    
+    const semester = prompt('Masukkan Semester (Ganjil/Genap):', 'Ganjil'); if (!semester) return;
+    
+    const siswaList = DB.siswa.filter(s => String(s.kelasId).trim() === String(targetKelasId).trim()).sort((a,b) => a.nama.localeCompare(b.nama)); 
+    const mapelList = DB.mapel; 
+    let tableRows = '';
+    
+    const yearStart = String(TAHUN_AJARAN_AKTIF).split('/')[0].trim(); 
 
-        siswaList.forEach((siswa, idx) => {
-          let nilaiHtml = mapelList.map(m => { 
-            const n = DB.nilai.find(x => 
-              String(x.siswaId).trim() === String(siswa.id).trim() && 
-              String(x.mapelId).trim() === String(m.id).trim() && 
-              String(x.semester).trim().toLowerCase() === String(semester).trim().toLowerCase() && 
-              String(x.tahunAjaran).trim() === String(TAHUN_AJARAN_AKTIF).trim()
-            ); 
-            return `<td style="text-align:center;">${n ? nilaiAkhir(n) : '-'}</td>`; 
-          }).join('');
-          
-          const absensi = DB.absensi.filter(a => {
-            const matchSiswa = String(a.siswaId).trim() === String(siswa.id).trim();
-            const matchTahun = String(a.tanggal).trim().startsWith(yearStart);
-            return matchSiswa && matchTahun;
-          });
+    siswaList.forEach((siswa, idx) => {
+      // 1. Hitung Nilai per Mapel
+      let nilaiHtml = mapelList.map(m => { 
+        const n = DB.nilai.find(x => 
+          String(x.siswaId).trim() === String(siswa.id).trim() && 
+          String(x.mapelId).trim() === String(m.id).trim() && 
+          String(x.semester).trim().toLowerCase() === String(semester).trim().toLowerCase() && 
+          String(x.tahunAjaran).trim() === String(TAHUN_AJARAN_AKTIF).trim()
+        ); 
+        return `<td style="text-align:center;">${n ? nilaiAkhir(n) : '-'}</td>`; 
+      }).join('');
+      
+      // 2. Ambil SEMUA absensi siswa ini di tahun ajaran aktif
+      const absensiSiswa = DB.absensi.filter(a => 
+        String(a.siswaId).trim() === String(siswa.id).trim() && 
+        String(a.tanggal).trim().startsWith(yearStart)
+      );
 
-          const h = absensi.filter(a => String(a.status).trim().toLowerCase() === 'hadir').length; 
-          const s = absensi.filter(a => String(a.status).trim().toLowerCase() === 'sakit').length; 
-          const i = absensi.filter(a => String(a.status).trim().toLowerCase() === 'izin').length; 
-          const a = absensi.filter(a => String(a.status).trim().toLowerCase() === 'alfa').length;
-          
-          tableRows += `<tr><td style="text-align:center;">${idx+1}</td><td>${siswa.nama}</td>${nilaiHtml}<td style="text-align:center;">${h}</td><td style="text-align:center;">${s}</td><td style="text-align:center;">${i}</td><td style="text-align:center;">${a}</td></tr>`;
-        });
+      // 3. Cari Tanggal Unik (Group by Date)
+      const tanggalUnik = [...new Set(absensiSiswa.map(a => String(a.tanggal).trim()))];
 
-        const html = `<html><head><title>Rekap Rapor</title><style>body{font-family:sans-serif;padding:30px; font-size:12px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:6px;} th{background:#eee;}</style></head><body>${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">REKAP RAPOR SISWA</h3><p style="text-align:center; margin-bottom:20px;">Kelas: ${nKelas(targetKelasId)} | Semester: ${semester} | TA: ${TAHUN_AJARAN_AKTIF}</p><table><thead><tr><th rowspan="2">No</th><th rowspan="2">Nama Siswa</th><th colspan="${mapelList.length}">Nilai Mapel</th><th colspan="4">Absensi</th></tr><tr>${mapelList.map(m => `<th>${m.kode}</th>`).join('')}<th>H</th><th>S</th><th>I</th><th>A</th></tr></thead><tbody>${tableRows}</tbody></table>${getTandaTangan('wali')}</body></html>`;
-        printHTML(html);
-      } catch (e) { alert("Error cetak: " + e.message); }
-    };
+      let h = 0, s = 0, i = 0, a = 0;
+
+      // 4. Hitung status per tanggal (prioritas: Hadir > Sakit > Izin > Alfa)
+      tanggalUnik.forEach(tgl => {
+        // Ambil semua record absensi siswa pada tanggal tersebut
+        const recordHariItu = absensiSiswa.filter(r => String(r.tanggal).trim() === tgl);
+        // Ambil semua status di hari itu (lowercase & trim)
+        const statusHariItu = recordHariItu.map(r => String(r.status).trim().toLowerCase());
+
+        if (statusHariItu.includes('hadir')) h++;
+        else if (statusHariItu.includes('sakit')) s++;
+        else if (statusHariItu.includes('izin')) i++;
+        else if (statusHariItu.includes('alfa')) a++;
+      });
+      
+      tableRows += `<tr><td style="text-align:center;">${idx+1}</td><td>${siswa.nama}</td>${nilaiHtml}<td style="text-align:center;">${h}</td><td style="text-align:center;">${s}</td><td style="text-align:center;">${i}</td><td style="text-align:center;">${a}</td></tr>`;
+    });
+
+    const html = `<html><head><title>Rekap Rapor</title><style>body{font-family:sans-serif;padding:30px; font-size:12px;} table{width:100%;border-collapse:collapse;margin-top:20px;} th,td{border:1px solid #000;padding:6px;} th{background:#eee;}</style></head><body>${getKopSurat()}<h3 style="text-align:center; text-decoration:underline;">REKAP RAPOR SISWA</h3><p style="text-align:center; margin-bottom:20px;">Kelas: ${nKelas(targetKelasId)} | Semester: ${semester} | TA: ${TAHUN_AJARAN_AKTIF}</p><table><thead><tr><th rowspan="2">No</th><th rowspan="2">Nama Siswa</th><th colspan="${mapelList.length}">Nilai Mapel</th><th colspan="4">Absensi (Hari)</th></tr><tr>${mapelList.map(m => `<th>${m.kode}</th>`).join('')}<th>H</th><th>S</th><th>I</th><th>A</th></tr></thead><tbody>${tableRows}</tbody></table>${getTandaTangan('wali')}</body></html>`;
+    printHTML(html);
+  } catch (e) { alert("Error cetak: " + e.message); }
+};
 
     async function submitForm(e, entity) {
       e.preventDefault(); const data = Object.fromEntries(new FormData(e.target).entries());
