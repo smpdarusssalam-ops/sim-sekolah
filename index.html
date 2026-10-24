@@ -155,10 +155,11 @@
     const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz0fwJLEkRD6tksUMn8xsvCtf9Tk3VbE7ZX8Uzeg4X5DD60TIk00vkwRQSs9VkgrecfdA/exec'; 
 
     let CURRENT_USER = null;
-    let TAHUN_AJARAN_AKTIF = '2024/2025';
+    let TAHUN_AJARAN_AKTIF = '2026/2027';
     let DB = { pengaturan: [], siswa: [], guru: [], kelas: [], mapel: [], jadwal: [], nilai: [], absensi: [], kasus: [], jurnal: [], agenda: [], audit: [] };
     let currentSubTab = 'kelas';
     let subTabAbsensi = 'input';
+    let editJadwalId = null; // <--- TAMBAHKAN BARIS INI
     
     const $ = (s) => document.querySelector(s);
     const esc = (s='') => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -621,17 +622,98 @@ window.submitGuru = async (e) => {
             <tbody>${kelasToShow.map(k => `<tr><td>${esc(k.nama)}</td><td>${esc(k.tingkat)}</td><td>${esc(nGuru(k.waliKelasId))}</td></tr>`).join('')}</tbody></table></div>
           </div>`;
       } 
-      else if (t === 'jadwal') {
+            else if (t === 'jadwal') {
+        const isAdmin = CURRENT_USER.role.toLowerCase().includes('admin');
         let jadwalToShow = DB.jadwal;
         if (waliInfo) jadwalToShow = DB.jadwal.filter(j => j.kelasId === waliInfo.kelasId);
         else if (isGuru && myGuruId) jadwalToShow = DB.jadwal.filter(j => j.guruId === myGuruId);
-        
+
+        // Urutkan jadwal berdasarkan hari dan jam
+        const urutanHari = { 'Senin': 1, 'Selasa': 2, 'Rabu': 3, 'Kamis': 4, 'Jumat': 5, 'Sabtu': 6 };
+        jadwalToShow.sort((a, b) => {
+          if (urutanHari[a.hari] !== urutanHari[b.hari]) return urutanHari[a.hari] - urutanHari[b.hari];
+          return String(a.jamMulai).localeCompare(String(b.jamMulai));
+        });
+
+        // Form HANYA muncul untuk Admin
+        let formJadwal = '';
+        if (isAdmin) {
+          formJadwal = `
+            <div class="card" id="formJadwalCard">
+              <h3 id="formJadwalTitle">📅 ${editJadwalId ? 'Edit' : 'Tambah'} Jadwal Pelajaran</h3>
+              <form onsubmit="submitJadwal(event)" id="formJadwal">
+                <input type="hidden" name="id" id="jadwalId" value="${editJadwalId || ''}">
+                <div class="form-grid">
+                  <div class="field">
+                    <label>Hari</label>
+                    <select name="hari" id="jadwalHari" required>
+                      <option value="Senin">Senin</option><option value="Selasa">Selasa</option>
+                      <option value="Rabu">Rabu</option><option value="Kamis">Kamis</option>
+                      <option value="Jumat">Jumat</option><option value="Sabtu">Sabtu</option>
+                    </select>
+                  </div>
+                  <div class="field"><label>Jam Mulai</label><input type="time" name="jamMulai" id="jadwalMulai" required></div>
+                  <div class="field"><label>Jam Selesai</label><input type="time" name="jamSelesai" id="jadwalSelesai" required></div>
+                  <div class="field">
+                    <label>Kelas</label>
+                    <select name="kelasId" id="jadwalKelas" required>
+                      ${DB.kelas.map(k => `<option value="${k.id}">${k.nama}</option>`).join('')}
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>Mata Pelajaran</label>
+                    <select name="mapelId" id="jadwalMapel" required>
+                      ${DB.mapel.map(m => `<option value="${m.id}">${m.nama}</option>`).join('')}
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>Guru Pengampu</label>
+                    <select name="guruId" id="jadwalGuru" required>
+                      ${DB.guru.map(g => `<option value="${g.id}">${g.nama}</option>`).join('')}
+                    </select>
+                  </div>
+                </div>
+                <div class="btn-row">
+                  <button class="btn btn-primary" type="submit" id="btnSimpanJadwal">💾 Simpan Jadwal</button>
+                  ${editJadwalId ? `<button class="btn btn-secondary" type="button" onclick="editJadwalId=null; activateSubTab('jadwal')">Batal</button>` : ''}
+                </div>
+              </form>
+            </div>
+          `;
+        }
+
         html = `
+          ${formJadwal}
           <div class="card">
-            <h3>Jadwal ${waliInfo ? 'Kelas ' + waliInfo.kelasNama : (isGuru ? 'Mengajar Anda' : '')}</h3>
-            <div class="table-wrap"><table><thead><tr><th>Hari</th><th>Jam</th><th>Kelas</th><th>Mapel</th><th>Guru</th></tr></thead>
-            <tbody>${jadwalToShow.map(j => `<tr><td>${esc(j.hari)}</td><td><b>${esc(j.jamMulai)} - ${esc(j.jamSelesai)}</b></td><td>${esc(nKelas(j.kelasId))}</td><td>${esc(nMapel(j.mapelId))}</td><td>${esc(nGuru(j.guruId))}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">Belum ada jadwal</td></tr>'}</tbody></table></div>
+            <h3>Jadwal ${waliInfo ? 'Kelas ' + waliInfo.kelasNama : (isGuru ? 'Mengajar Anda' : 'Semua Kelas')}</h3>
+            <div class="table-wrap"><table><thead><tr><th>Hari</th><th>Jam</th><th>Kelas</th><th>Mapel</th><th>Guru</th>${isAdmin ? '<th>Aksi</th>' : ''}</tr></thead>
+            <tbody>${jadwalToShow.map(j => `<tr>
+              <td><b>${esc(j.hari)}</b></td>
+              <td>${esc(j.jamMulai)} - ${esc(j.jamSelesai)}</td>
+              <td><span class="badge b-blue">${esc(nKelas(j.kelasId))}</span></td>
+              <td>${esc(nMapel(j.mapelId))}</td>
+              <td>${esc(nGuru(j.guruId))}</td>
+              ${isAdmin ? `<td>
+                <button class="btn btn-warning btn-sm" onclick="editJadwal('${j.id}')">Edit</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteData('jadwal','${j.id}')">Hapus</button>
+              </td>` : ''}
+            </tr>`).join('') || `<tr><td colspan="${isAdmin ? 6 : 5}" class="empty">Belum ada jadwal</td></tr>`}</tbody></table></div>
           </div>`;
+        
+        // Isi form jika sedang mode edit
+        if (editJadwalId) {
+          setTimeout(() => {
+            const j = DB.jadwal.find(x => x.id === editJadwalId);
+            if (j) {
+              document.getElementById('jadwalHari').value = j.hari;
+              document.getElementById('jadwalMulai').value = j.jamMulai;
+              document.getElementById('jadwalSelesai').value = j.jamSelesai;
+              document.getElementById('jadwalKelas').value = j.kelasId;
+              document.getElementById('jadwalMapel').value = j.mapelId;
+              document.getElementById('jadwalGuru').value = j.guruId;
+            }
+          }, 100);
+        }
       } 
       else if (t === 'nilai') {
         let filterMapel = DB.mapel, filterKelas = DB.kelas;
@@ -1127,7 +1209,39 @@ window.submitGuru = async (e) => {
       TAHUN_AJARAN_AKTIF = getVal('tahunAjaranAktif', TAHUN_AJARAN_AKTIF);
       hideLoading(); toast('Pengaturan disimpan!'); navigate('administrasi');
     };
+window.editJadwal = (id) => {
+  editJadwalId = id;
+  activateSubTab('jadwal');
+};
 
+window.submitJadwal = async (e) => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target).entries());
+  const id = data.id;
+  delete data.id;
+  
+  showLoading('Menyimpan jadwal...');
+  try {
+    if (id) {
+      // Proses Update
+      await apiCall('update', 'jadwal', { id: id, data: data });
+      const idx = DB.jadwal.findIndex(x => x.id === id);
+      if (idx > -1) DB.jadwal[idx] = { id, ...data };
+      toast('Jadwal berhasil diupdate!');
+    } else {
+      // Proses Create Baru
+      const res = await apiCall('create', 'jadwal', { data: data });
+      DB.jadwal.push(res.data);
+      toast('Jadwal baru berhasil disimpan!');
+    }
+    editJadwalId = null;
+    activateSubTab('jadwal'); // Refresh tabel
+  } catch (err) { 
+    toast(err.message, 'error'); 
+  } finally { 
+    hideLoading(); 
+  }
+};
     function renderAgenda() {
   const isAdmin = CURRENT_USER.role.toLowerCase().includes('admin');
   let formHtml = '';
