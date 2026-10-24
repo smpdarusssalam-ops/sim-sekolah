@@ -702,7 +702,7 @@
       tableHtml += `<td><input type="number" class="nilai-input inp-nilai" data-type="uts" value="${uts}"></td><td><input type="number" class="nilai-input inp-nilai" data-type="uas" value="${uas}"></td><td><b class="nilai-akhir-text">-</b></td></tr>`;
     });
     
-    tableHtml += `</tbody></table></div><div class="btn-row"><button class="btn btn-success" onclick="simpanSemuaNilai('${mapelId}', '${kelasId}', '${semester}')">💾 Simpan Nilai (Bulk)</button></div></div>`;
+    tableHtml += `</tbody></table></div><div class="btn-row"><button type="button" class="btn btn-success" onclick="simpanSemuaNilai('${mapelId}', '${kelasId}', '${semester}')">💾 Simpan Nilai (Bulk)</button>
     
     document.getElementById('tabelNilaiContainer').innerHTML = tableHtml;
     document.querySelectorAll('.inp-nilai').forEach(inp => inp.addEventListener('input', (e) => hitungNilaiAkhirRow(e.target.closest('tr'))));
@@ -827,8 +827,7 @@ window.muatTabelAbsensi = async () => {
           </table>
         </div>
         <div class="btn-row">
-          <button class="btn btn-success" onclick="simpanSemuaAbsensi('${mapelId}', '${tanggal}')">💾 Validasi & Simpan Absensi</button>
-        </div>
+          <button type="button" class="btn btn-success" onclick="simpanSemuaAbsensi('${mapelId}', '${tanggal}')">💾 Validasi & Simpan Absensi</button>        </div>
       </div>`;
 
     document.getElementById('tabelAbsensiContainer').innerHTML = tableHtml;
@@ -987,6 +986,110 @@ window.muatTabelAbsensi = async () => {
       } catch (e) { alert("Error cetak: " + e.message); }
     };
 
+window.simpanSemuaAbsensi = async (mapelId, tanggal) => {
+  try {
+    const rows = document.querySelectorAll('#tabelAbsensiContainer tbody tr');
+    if (rows.length === 0) return alert('Tidak ada data absensi untuk disimpan.');
+    
+    showLoading('Menyimpan...'); 
+    const payload = [];
+    
+    for (const tr of rows) {
+      const siswaId = tr.dataset.siswa;
+      const absenId = tr.dataset.absenId; // Kosong jika belum pernah disimpan
+      const status = tr.querySelector('.inp-absen-status').value;
+      const keterangan = tr.querySelector('.inp-absen-ket').value;
+      
+      payload.push({ 
+        id: absenId || '', // Kirim string kosong jika baru
+        siswaId, 
+        mapelId, 
+        tanggal, 
+        status, 
+        keterangan 
+      });
+    }
+
+    // Proses simpan ke backend (GAS)
+    const res = await apiCall('bulkSave', 'absensi', { data: payload });
+    toast('Absensi berhasil divalidasi & disimpan!');
+    
+    // Perbarui data di memori lokal
+    payload.forEach(item => {
+      const idx = DB.absensi.findIndex(x => x.id === item.id);
+      if (idx > -1) {
+        DB.absensi[idx] = { ...DB.absensi[idx], ...item };
+      } else {
+        // Karena ID baru dibuat oleh server, kita tidak tahu ID-nya di sini. 
+        // Solusi tercepat: tarik ulang data dari server.
+      }
+    });
+    
+    // Tarik ulang data terbaru dari server agar ID data baru (jika ada) sinkron
+    const allRes = await apiCall('getAllData');
+    DB = { ...DB, ...allRes.data };
+    
+    muatTabelAbsensi(); // Refresh tampilan tabel
+    
+  } catch (e) { 
+    console.error("Gagal simpan absensi:", e);
+    alert('❌ Gagal menyimpan absensi: ' + e.message); 
+  } finally { 
+    hideLoading(); 
+  }
+};
+    
+window.simpanSemuaNilai = async (mapelId, kelasId, semester) => {
+  try {
+    const rows = document.querySelectorAll('#tabelNilaiContainer tbody tr');
+    if (rows.length === 0) return alert('Tidak ada data untuk disimpan.');
+    
+    showLoading('Menyimpan...'); 
+    const payload = [];
+    
+    for (const tr of rows) {
+      const siswaId = tr.dataset.siswa, nilaiId = tr.dataset.nilaiId;
+      let harianArr = [], uts = 0, uas = 0;
+      tr.querySelectorAll('.inp-nilai').forEach(inp => {
+        if (inp.dataset.type === 'harian') harianArr.push(inp.value === '' ? 0 : Number(inp.value));
+        else if (inp.dataset.type === 'uts') uts = inp.value === '' ? 0 : Number(inp.value);
+        else if (inp.dataset.type === 'uas') uas = inp.value === '' ? 0 : Number(inp.value);
+      });
+      payload.push({ 
+        id: nilaiId || '', 
+        siswaId, 
+        mapelId, 
+        semester, 
+        tahunAjaran: TAHUN_AJARAN_AKTIF, 
+        harian: harianArr.join(','), 
+        uts, 
+        uas 
+      });
+    }
+
+    // Tembak API
+    const res = await apiCall('bulkSave', 'nilai', { data: payload });
+    toast('Nilai berhasil disimpan!');
+    
+    // Perbarui data di memori lokal tanpa fetch ulang agar cepat
+    payload.forEach(item => {
+      const idx = DB.nilai.findIndex(x => x.id === item.id);
+      if (idx > -1) {
+        DB.nilai[idx] = { ...DB.nilai[idx], ...item };
+      } else {
+        // Jika data baru, kita tidak tahu ID aslinya dari server, 
+        // tapi kita muat ulang tabel saja agar data terbaru ditarik
+      }
+    });
+    
+    muatTabelNilai(); // Refresh tampilan
+  } catch (e) { 
+    console.error("Gagal simpan nilai:", e);
+    alert('❌ Gagal menyimpan nilai: ' + e.message); 
+  } finally { 
+    hideLoading(); 
+  }
+};
     window.cetakRaporWaliKelas = () => {
       try {
         const waliInfo = getMyWaliKelasInfo();
