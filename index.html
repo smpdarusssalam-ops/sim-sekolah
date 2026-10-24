@@ -662,32 +662,37 @@
       } catch (e) { toast(e.message, 'error'); } finally { hideLoading(); }
     };
 
-    window.muatTabelNilai = () => {
+  window.muatTabelNilai = () => {
   try {
     const mapelId = document.getElementById('inpMapel')?.value;
     const kelasId = document.getElementById('inpKelas')?.value;
     const semester = document.getElementById('inpSem')?.value;
     const jmlHarian = parseInt(document.getElementById('inpHarianCount')?.value || 3);
     
-    console.log("Tombol Nilai diklik. Mapel:", mapelId, "Kelas:", kelasId);
+    if (!mapelId || !kelasId) return alert("⚠️ Pilih Mata Pelajaran dan Kelas terlebih dahulu!");
 
-    if (!mapelId || !kelasId) {
-      return alert("⚠️ Pilih Mata Pelajaran dan Kelas terlebih dahulu!");
-    }
-
-    // Filter siswa dengan aman (ubah keduanya jadi string dan buang spasi)
     const siswaList = DB.siswa.filter(s => String(s.kelasId).trim() === String(kelasId).trim());
     
-    console.log("Siswa ditemukan di kelas ini:", siswaList.length);
-
     if (siswaList.length === 0) {
-      return document.getElementById('tabelNilaiContainer').innerHTML = `<div class="card"><p class="empty" style="text-align:center; color:red;">Tidak ada siswa di kelas ini. (Total siswa di database: ${DB.siswa.length})</p></div>`;
+      return document.getElementById('tabelNilaiContainer').innerHTML = `<div class="card"><p class="empty" style="text-align:center; color:red;">Tidak ada siswa di kelas ini.</p></div>`;
     }
 
-    let tableHtml = `<div class="card"><h3>Daftar Nilai: ${nMapel(mapelId)} - ${nKelas(kelasId)}</h3><div class="table-wrap"><table><thead><tr><th>Nama Siswa</th>${Array.from({length: jmlHarian}, (_, i) => `<th>H${i+1}</th>`).join('')}<th>UTS</th><th>UAS</th><th>Akhir</th></tr></thead><tbody>`;
+    let tableHtml = `<div class="card"><h3>Daftar Nilai: ${nMapel(mapelId)} - ${nKelas(kelasId)} (${semester})</h3><div class="table-wrap"><table><thead><tr><th>Nama Siswa</th>${Array.from({length: jmlHarian}, (_, i) => `<th>H${i+1}</th>`).join('')}<th>UTS</th><th>UAS</th><th>Akhir</th></tr></thead><tbody>`;
     
+    let dataDitemukan = 0;
+
     siswaList.forEach(siswa => {
-      const existing = DB.nilai.find(n => String(n.siswaId).trim() === String(siswa.id).trim() && String(n.mapelId).trim() === String(mapelId).trim() && n.semester === semester && n.tahunAjaran === TAHUN_AJARAN_AKTIF);
+      // PERBAIKAN: Pencocokan ID dan Teks dibuat lebih kebal (mengabaikan spasi dan huruf besar/kecil)
+      const existing = DB.nilai.find(n => {
+        const matchSiswa = String(n.siswaId).trim() === String(siswa.id).trim();
+        const matchMapel = String(n.mapelId).trim() === String(mapelId).trim();
+        const matchSemester = String(n.semester).trim().toLowerCase() === String(semester).trim().toLowerCase();
+        const matchTahun = String(n.tahunAjaran).trim() === String(TAHUN_AJARAN_AKTIF).trim();
+        return matchSiswa && matchMapel && matchSemester && matchTahun;
+      });
+
+      if (existing) dataDitemukan++;
+
       let harianArr = existing && existing.harian ? String(existing.harian).split(',').map(Number) : [];
       const uts = existing && existing.uts ? existing.uts : '';
       const uas = existing && existing.uas ? existing.uas : '';
@@ -703,10 +708,16 @@
     document.querySelectorAll('.inp-nilai').forEach(inp => inp.addEventListener('input', (e) => hitungNilaiAkhirRow(e.target.closest('tr'))));
     document.querySelectorAll('#tabelNilaiContainer tbody tr').forEach(tr => hitungNilaiAkhirRow(tr));
 
+    // Pesan bantuan di Console (F12) untuk mendeteksi masalah
+    console.log(`Pencarian Nilai: Mapel=${mapelId}, Kelas=${kelasId}, Sem=${semester}, TA=${TAHUN_AJARAN_AKTIF}`);
+    console.log(`Data nilai ditemukan di memori: ${dataDitemukan} baris.`);
+    if (dataDitemukan === 0) {
+      console.warn("Data nilai tidak ditemukan. Kemungkinan ID Siswa/Mapel di sheet Nilai tidak cocok, atau belum tersimpan di Tahun Ajaran ini.");
+    }
+
   } catch (error) {
     console.error(error);
     alert("❌ Gagal memuat tabel nilai: " + error.message);
-    document.getElementById('tabelNilaiContainer').innerHTML = `<div class="card"><p style="color:red; text-align:center;">Error: ${error.message}</p></div>`;
   }
 };
 window.hitungNilaiAkhirRow = (tr) => {
