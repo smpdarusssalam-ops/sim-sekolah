@@ -662,6 +662,161 @@
       } catch (e) { toast(e.message, 'error'); } finally { hideLoading(); }
     };
 
+    window.muatTabelNilai = () => {
+  try {
+    const mapelId = document.getElementById('inpMapel')?.value;
+    const kelasId = document.getElementById('inpKelas')?.value;
+    const semester = document.getElementById('inpSem')?.value;
+    const jmlHarian = parseInt(document.getElementById('inpHarianCount')?.value || 3);
+    
+    console.log("Tombol Nilai diklik. Mapel:", mapelId, "Kelas:", kelasId);
+
+    if (!mapelId || !kelasId) {
+      return alert("⚠️ Pilih Mata Pelajaran dan Kelas terlebih dahulu!");
+    }
+
+    // Filter siswa dengan aman (ubah keduanya jadi string dan buang spasi)
+    const siswaList = DB.siswa.filter(s => String(s.kelasId).trim() === String(kelasId).trim());
+    
+    console.log("Siswa ditemukan di kelas ini:", siswaList.length);
+
+    if (siswaList.length === 0) {
+      return document.getElementById('tabelNilaiContainer').innerHTML = `<div class="card"><p class="empty" style="text-align:center; color:red;">Tidak ada siswa di kelas ini. (Total siswa di database: ${DB.siswa.length})</p></div>`;
+    }
+
+    let tableHtml = `<div class="card"><h3>Daftar Nilai: ${nMapel(mapelId)} - ${nKelas(kelasId)}</h3><div class="table-wrap"><table><thead><tr><th>Nama Siswa</th>${Array.from({length: jmlHarian}, (_, i) => `<th>H${i+1}</th>`).join('')}<th>UTS</th><th>UAS</th><th>Akhir</th></tr></thead><tbody>`;
+    
+    siswaList.forEach(siswa => {
+      const existing = DB.nilai.find(n => String(n.siswaId).trim() === String(siswa.id).trim() && String(n.mapelId).trim() === String(mapelId).trim() && n.semester === semester && n.tahunAjaran === TAHUN_AJARAN_AKTIF);
+      let harianArr = existing && existing.harian ? String(existing.harian).split(',').map(Number) : [];
+      const uts = existing && existing.uts ? existing.uts : '';
+      const uas = existing && existing.uas ? existing.uas : '';
+      
+      tableHtml += `<tr data-siswa="${siswa.id}" data-nilai-id="${existing ? existing.id : ''}"><td>${siswa.nama}</td>`;
+      for (let i = 0; i < jmlHarian; i++) tableHtml += `<td><input type="number" class="nilai-input inp-nilai" data-type="harian" value="${harianArr[i] !== undefined ? harianArr[i] : ''}"></td>`;
+      tableHtml += `<td><input type="number" class="nilai-input inp-nilai" data-type="uts" value="${uts}"></td><td><input type="number" class="nilai-input inp-nilai" data-type="uas" value="${uas}"></td><td><b class="nilai-akhir-text">-</b></td></tr>`;
+    });
+    
+    tableHtml += `</tbody></table></div><div class="btn-row"><button class="btn btn-success" onclick="simpanSemuaNilai('${mapelId}', '${kelasId}', '${semester}')">💾 Simpan Nilai (Bulk)</button></div></div>`;
+    
+    document.getElementById('tabelNilaiContainer').innerHTML = tableHtml;
+    document.querySelectorAll('.inp-nilai').forEach(inp => inp.addEventListener('input', (e) => hitungNilaiAkhirRow(e.target.closest('tr'))));
+    document.querySelectorAll('#tabelNilaiContainer tbody tr').forEach(tr => hitungNilaiAkhirRow(tr));
+
+  } catch (error) {
+    console.error(error);
+    alert("❌ Gagal memuat tabel nilai: " + error.message);
+    document.getElementById('tabelNilaiContainer').innerHTML = `<div class="card"><p style="color:red; text-align:center;">Error: ${error.message}</p></div>`;
+  }
+};
+window.muatTabelAbsensi = async () => {
+  try {
+    const mapelId = document.getElementById('inpAbsenMapel')?.value;
+    const kelasId = document.getElementById('inpAbsenKelas')?.value;
+    const tanggal = document.getElementById('inpAbsenTgl')?.value;
+    
+    console.log("Tombol Absensi diklik. Mapel:", mapelId, "Kelas:", kelasId, "Tgl:", tanggal);
+
+    if (!mapelId || !kelasId || !tanggal) return alert('⚠️ Lengkapi Mapel, Kelas, dan Tanggal terlebih dahulu!');
+
+    const siswaList = DB.siswa.filter(s => String(s.kelasId).trim() === String(kelasId).trim() && (!s.status || String(s.status).toLowerCase() === 'aktif'));
+    
+    console.log("Siswa aktif ditemukan:", siswaList.length);
+
+    if (siswaList.length === 0) {
+      return document.getElementById('tabelAbsensiContainer').innerHTML = `<div class="card"><p class="empty" style="text-align:center; color:red;">Tidak ada siswa aktif di kelas ini. (Total siswa di database: ${DB.siswa.length})</p></div>`;
+    }
+
+    showLoading('Menarik data gerbang...');
+
+    let dataGerbang = [];
+    try {
+      const resGerbang = await apiCall('laporan', 'absensiGerbang', { data: { jenis: 'harian', tanggal: tanggal } });
+      if (resGerbang.success && resGerbang.data) dataGerbang = resGerbang.data;
+    } catch (e) {
+      console.log("Info: Data gerbang tidak ditarik.");
+    }
+
+    hideLoading();
+
+    let tableHtml = `
+      <div class="card">
+        <h3>Validasi Absensi ${nKelas(kelasId)} - ${nMapel(mapelId)} (${formatTanggalIndo(tanggal)})</h3>
+        <div class="hint" style="margin-bottom:10px;">💡 Status <b>Hadir</b> otomatis terisi jika siswa sudah scan di gerbang. Guru cukup menyesuaikan jika ada siswa bolos.</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Nama Siswa</th>
+                <th>Kelas</th>
+                <th>Info Gerbang</th>
+                <th>Status Kelas</th>
+                <th>Keterangan</th>
+              </tr>
+            </thead>
+            <tbody>`;
+
+    siswaList.forEach(siswa => {
+      const existing = DB.absensi.find(a => String(a.siswaId).trim() === String(siswa.id).trim() && String(a.mapelId).trim() === String(mapelId).trim() && String(a.tanggal).trim() === String(tanggal).trim());
+      
+      const nisSiswa = String(siswa.nis).trim();
+      const scan = dataGerbang.find(g => String(g.nis).trim() === nisSiswa);
+
+      let badgeGerbang = `<span class="badge b-red">Tidak Scan</span>`;
+      if (scan && scan.jamMasuk && scan.jamMasuk !== '-') {
+        let jamTampil = scan.jamMasuk;
+        if (String(jamTampil).includes('1899-12-30T')) {
+          jamTampil = String(jamTampil).split('T')[1].substring(0, 5);
+        } else if (String(jamTampil).includes('T')) {
+          jamTampil = new Date(jamTampil).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
+        }
+        badgeGerbang = `<span class="badge b-green">Hadir ${jamTampil}</span>`;
+      }
+
+      let defaultStatus = 'Alfa'; 
+      if (existing) {
+        defaultStatus = existing.status;
+      } else if (scan && scan.jamMasuk && scan.jamMasuk !== '-') {
+        defaultStatus = 'Hadir'; 
+      }
+
+      const ket = existing ? existing.keterangan : '';
+
+      tableHtml += `
+        <tr data-siswa="${siswa.id}" data-absen-id="${existing ? existing.id : ''}">
+          <td><b>${esc(siswa.nama)}</b><br><span style="font-size:.72rem;color:var(--muted);">${esc(siswa.nis)}</span></td>
+          <td><span class="badge b-blue">${esc(nKelas(siswa.kelasId))}</span></td>
+          <td>${badgeGerbang}</td>
+          <td>
+            <select class="inp-absen-status" style="width:100px;">
+              <option value="Hadir" ${defaultStatus==='Hadir'?'selected':''}>Hadir</option>
+              <option value="Sakit" ${defaultStatus==='Sakit'?'selected':''}>Sakit</option>
+              <option value="Izin" ${defaultStatus==='Izin'?'selected':''}>Izin</option>
+              <option value="Alfa" ${defaultStatus==='Alfa'?'selected':''}>Alfa</option>
+            </select>
+          </td>
+          <td><input type="text" class="inp-absen-ket" value="${esc(ket)}" placeholder="Opsional"></td>
+        </tr>`;
+    });
+
+    tableHtml += `
+            </tbody>
+          </table>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-success" onclick="simpanSemuaAbsensi('${mapelId}', '${tanggal}')">💾 Validasi & Simpan Absensi</button>
+        </div>
+      </div>`;
+
+    document.getElementById('tabelAbsensiContainer').innerHTML = tableHtml;
+
+  } catch (error) {
+    hideLoading();
+    console.error(error);
+    alert("❌ Gagal memuat tabel absensi: " + error.message);
+    document.getElementById('tabelAbsensiContainer').innerHTML = `<div class="card"><p style="color:red; text-align:center;">Error: ${error.message}</p></div>`;
+  }
+};
     function renderKasus() {
       const isGuru = CURRENT_USER.role.toLowerCase().includes('guru'); const waliInfo = getMyWaliKelasInfo();
       let myGuruId = null, filterMapelForm = DB.mapel, filterKelasForm = DB.kelas, kasusToShow = DB.kasus;
