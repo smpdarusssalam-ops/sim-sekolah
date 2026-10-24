@@ -439,7 +439,7 @@ function getTandaTangan(role = 'guru', mapelId = null) {
           <div class="field"><label>NUPTK / NIP</label><input name="nip" id="guruNip" required></div>
           <div class="field"><label>Nama Lengkap</label><input name="nama" id="guruNama" required></div>
           
-          <!-- UPDATE DI SINI: Tambah Tombol + Mapel -->
+          <!-- MAPEL DENGAN TOMBOL TAMBAH -->
           <div class="field">
             <label style="display:flex; justify-content:space-between; align-items:center;">
               Mapel yang Diampu
@@ -451,13 +451,18 @@ function getTandaTangan(role = 'guru', mapelId = null) {
             </select>
           </div>
 
+          <!-- KELAS DENGAN TOMBOL TAMBAH -->
           <div class="field">
-            <label>Kelas yang Diampu (Bisa pilih banyak)</label>
+            <label style="display:flex; justify-content:space-between; align-items:center;">
+              Kelas yang Diampu
+              <button type="button" class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px; border-radius:4px;" onclick="tambahKelasBaru()">+ Kelas Baru</button>
+            </label>
             <select name="kelasIds" id="guruKelasIds" multiple style="height: 100px;">
               ${DB.kelas.map(k => `<option value="${k.id}">${k.nama}</option>`).join('')}
             </select>
             <small style="color:var(--muted); font-size:10px;">Tahan Ctrl/Shift untuk pilih banyak kelas</small>
           </div>
+
           <div class="field"><label>Status</label>
             <select name="status" id="guruStatus">
               <option>PNS</option><option>PPPK</option><option>GTT</option><option>Honorer</option>
@@ -491,13 +496,7 @@ function getTandaTangan(role = 'guru', mapelId = null) {
     </div>`;
 }
 
-// Fungsi bantuan untuk menampilkan badge kelas
-function nKelasMengajar(idsStr) {
-  if (!idsStr) return '<span class="badge b-red">Belum diset</span>';
-  const ids = String(idsStr).split(',');
-  const names = ids.map(id => nKelas(id)).filter(name => name !== '—');
-  return names.map(n => `<span class="badge b-green">${n}</span>`).join(' ');
-}
+    
 window.editGuru = (id) => {
   const g = DB.guru.find(x => x.id === id);
   if (!g) return;
@@ -529,6 +528,51 @@ window.resetFormGuru = () => {
   document.getElementById('btnBatalGuru').style.display = 'none';
 };
 
+window.tambahKelasBaru = async () => {
+  const nama = prompt("Masukkan Nama Kelas Baru:\n(Contoh: VII C)");
+  if (!nama) return;
+  
+  const tingkat = prompt("Masukkan Tingkat Kelas (Angka):\n(Contoh: 7, 8, 9)", nama.substring(0, 1));
+  if (!tingkat) return;
+
+  showLoading('Menyimpan kelas...');
+  try {
+    // Simpan ke database melalui API
+    const res = await apiCall('create', 'kelas', { data: { nama: nama, tingkat: tingkat, waliKelasId: '' } });
+    
+    // Tambahkan ke memori aplikasi
+    DB.kelas.push(res.data);
+    toast('Kelas baru berhasil ditambahkan!');
+    
+    // Simpan ID guru yang mungkin sedang diedit
+    const currentEditId = document.getElementById('guruId').value;
+    
+    // Refresh halaman form guru
+    navigate('guru');
+    
+    // Jika tadi sedang edit guru, kembalikan form ke mode edit dan pilih kelas barunya
+    if (currentEditId) {
+      setTimeout(() => {
+        editGuru(currentEditId);
+        const selectEl = document.getElementById('guruKelasIds');
+        const opt = Array.from(selectEl.options).find(o => o.value === res.data.id);
+        if (opt) opt.selected = true; // Otomatis centang kelas baru
+      }, 100);
+    } else {
+      // Jika tambah guru baru, langsung pilih kelas barunya
+      setTimeout(() => {
+        const selectEl = document.getElementById('guruKelasIds');
+        const opt = Array.from(selectEl.options).find(o => o.value === res.data.id);
+        if (opt) opt.selected = true;
+      }, 100);
+    }
+    
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    hideLoading();
+  }
+};
 window.tambahMapelBaru = async () => {
   const nama = prompt("Masukkan Nama Mata Pelajaran Baru:\n(Contoh: Bahasa Sunda)");
   if (!nama) return;
