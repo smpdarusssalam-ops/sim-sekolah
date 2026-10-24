@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SIM SMP Darussalam</title>
+  <title>SIM SMP Darussalam Tarogong Keler</title>
   <style>
     :root {
       --primary: #2563eb; --primary-dark: #1d4ed8; --bg: #f1f5f9;
@@ -106,7 +106,7 @@
     <aside class="sidebar" id="sidebar">
       <div class="brand">
   <img src="https://lh3.googleusercontent.com/d/1Q_M3uyUOiwcnE8pcTHBGwPPCBIWV28rO" style="width:35px; height:35px; border-radius:50%; object-fit:cover;">
-  <div><div class="name">SIM SEKOLAH</div><div class="sub">Darussalam</div></div>
+  <div><div class="name">SIM SEKOLAH</div><div class="sub">Darussalam Tarogong Keler</div></div>
 </div>
       
       <div class="nav-section">Menu Utama</div>
@@ -443,6 +443,13 @@ function getTandaTangan(role = 'guru', mapelId = null) {
               ${DB.mapel.map(m => `<option value="${m.id}">${m.nama}</option>`).join('')}
             </select>
           </div>
+          <div class="field">
+            <label>Kelas yang Diampu (Bisa pilih banyak)</label>
+            <select name="kelasIds" id="guruKelasIds" multiple style="height: 100px;">
+              ${DB.kelas.map(k => `<option value="${k.id}">${k.nama}</option>`).join('')}
+            </select>
+            <small style="color:var(--muted); font-size:10px;">Tahan Ctrl/Shift untuk pilih banyak kelas</small>
+          </div>
           <div class="field"><label>Status</label>
             <select name="status" id="guruStatus">
               <option>PNS</option><option>PPPK</option><option>GTT</option><option>Honorer</option>
@@ -457,13 +464,14 @@ function getTandaTangan(role = 'guru', mapelId = null) {
     </div>
     <div class="card">
       <h3>📋 Daftar Guru & Pegawai (${DB.guru.length} Data)</h3>
-      <div class="table-wrap"><table><thead><tr><th>NUPTK</th><th>Nama</th><th>Mapel</th><th>Wali Kelas</th><th>Aksi</th></tr></thead>
+      <div class="table-wrap"><table><thead><tr><th>NUPTK</th><th>Nama</th><th>Mapel</th><th>Kelas Mengajar</th><th>Wali Kelas</th><th>Aksi</th></tr></thead>
       <tbody>${DB.guru.map(g => {
         const waliKelas = DB.kelas.find(k => k.waliKelasId === g.id);
         return `<tr>
           <td>${esc(g.nip)}</td>
           <td>${esc(g.nama)}</td>
           <td><b>${esc(nMapel(g.mapelId))}</b></td>
+          <td>${nKelasMengajar(g.kelasIds)}</td>
           <td>${waliKelas ? `<span class="badge b-blue">${waliKelas.nama}</span>` : '-'}</td>
           <td>
             <button class="btn btn-warning btn-sm" onclick="editGuru('${g.id}')">Edit</button>
@@ -474,23 +482,34 @@ function getTandaTangan(role = 'guru', mapelId = null) {
       }).join('')}</tbody></table></div>
     </div>`;
 }
+
+// Fungsi bantuan untuk mengubah ID Kelas menjadi Nama Kelas
+function nKelasMengajar(idsStr) {
+  if (!idsStr) return '<span class="badge b-red">Belum diset</span>';
+  const ids = String(idsStr).split(',');
+  const names = ids.map(id => nKelas(id)).filter(name => name !== '—');
+  return names.map(n => `<span class="badge b-green">${n}</span>`).join(' ');
+}
 window.editGuru = (id) => {
   const g = DB.guru.find(x => x.id === id);
   if (!g) return;
   
-  // Isi form dengan data guru yang dipilih
   document.getElementById('guruId').value = g.id;
   document.getElementById('guruNip').value = g.nip || '';
   document.getElementById('guruNama').value = g.nama || '';
   document.getElementById('guruMapel').value = g.mapelId || '';
   document.getElementById('guruStatus').value = g.status || 'PNS';
   
-  // Ubah tampilan form menjadi mode Edit
+  // Set multi-select untuk kelas
+  const selectedKelas = String(g.kelasIds || '').split(',');
+  const selectEl = document.getElementById('guruKelasIds');
+  Array.from(selectEl.options).forEach(opt => {
+    opt.selected = selectedKelas.includes(opt.value);
+  });
+  
   document.getElementById('formGuruTitle').innerText = '✏️ Edit Data Guru';
   document.getElementById('btnSimpanGuru').innerText = '💾 Update Data';
   document.getElementById('btnBatalGuru').style.display = 'inline-flex';
-  
-  // Scroll ke atas form
   document.getElementById('formGuruCard').scrollIntoView({ behavior: 'smooth' });
 };
 
@@ -504,33 +523,39 @@ window.resetFormGuru = () => {
 
 window.submitGuru = async (e) => {
   e.preventDefault();
-  const data = Object.fromEntries(new FormData(e.target).entries());
+  
+  // Ambil data dari form
+  const formData = new FormData(e.target);
+  const data = Object.fromEntries(formData.entries());
+  
+  // Ambil data multiple select kelasIds
+  const selectEl = document.getElementById('guruKelasIds');
+  const selectedKelas = Array.from(selectEl.selectedOptions).map(opt => opt.value);
+  data.kelasIds = selectedKelas.join(','); // Simpan sebagai teks dipisah koma
+  
   const id = data.id;
   delete data.id;
   
   showLoading('Menyimpan...');
   try {
     if (id) {
-      // Proses Update
       await apiCall('update', 'guru', { id: id, data: data });
       const idx = DB.guru.findIndex(x => x.id === id);
       if (idx > -1) DB.guru[idx] = { id, ...data };
       toast('Data guru berhasil diupdate!');
     } else {
-      // Proses Create (Tambah Baru)
       const res = await apiCall('create', 'guru', { data: data });
       DB.guru.push(res.data);
       toast('Guru baru berhasil disimpan!');
     }
     resetFormGuru();
-    navigate('guru'); // Refresh tabel
-  } catch (err) {
-    toast(err.message, 'error');
-  } finally {
-    hideLoading();
+    navigate('guru');
+  } catch (err) { 
+    toast(err.message, 'error'); 
+  } finally { 
+    hideLoading(); 
   }
 };
-
     
     window.editWaliKelas = async (guruId) => {
       const currentWali = DB.kelas.find(k => k.waliKelasId === guruId);
