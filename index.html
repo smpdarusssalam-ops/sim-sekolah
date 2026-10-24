@@ -647,7 +647,7 @@ window.submitGuru = async (e) => {
       </div></div><div id="subContent"></div>`;
     }
 
-    function activateSubTab(t) {
+        function activateSubTab(t) {
       currentSubTab = t;
       let html = '';
       const isGuru = CURRENT_USER.role.toLowerCase().includes('guru');
@@ -659,6 +659,9 @@ window.submitGuru = async (e) => {
         if (myGuru) myGuruId = myGuru.id;
       }
 
+      // ==========================================
+      // 1. SUB-TAB KELAS
+      // ==========================================
       if (t === 'kelas') {
         let tombolRapor = (!isGuru && !waliInfo) ? `<button class="btn btn-danger" onclick="cetakRaporWaliKelas()">🖨️ Cetak Rapor Wali Kelas</button>` : 
                           (waliInfo ? `<button class="btn btn-danger" onclick="cetakRaporWaliKelas()">🖨️ Cetak Rapor Kelas ${waliInfo.kelasNama}</button>` : '');
@@ -671,20 +674,22 @@ window.submitGuru = async (e) => {
             <tbody>${kelasToShow.map(k => `<tr><td>${esc(k.nama)}</td><td>${esc(k.tingkat)}</td><td>${esc(nGuru(k.waliKelasId))}</td></tr>`).join('')}</tbody></table></div>
           </div>`;
       } 
-            else if (t === 'jadwal') {
+      // ==========================================
+      // 2. SUB-TAB JADWAL
+      // ==========================================
+      else if (t === 'jadwal') {
         const isAdmin = CURRENT_USER.role.toLowerCase().includes('admin');
         let jadwalToShow = DB.jadwal;
         if (waliInfo) jadwalToShow = DB.jadwal.filter(j => j.kelasId === waliInfo.kelasId);
         else if (isGuru && myGuruId) jadwalToShow = DB.jadwal.filter(j => j.guruId === myGuruId);
 
-        // Urutkan jadwal berdasarkan hari dan jam
+        // Urutkan berdasarkan Hari dan Jam
         const urutanHari = { 'Senin': 1, 'Selasa': 2, 'Rabu': 3, 'Kamis': 4, 'Jumat': 5, 'Sabtu': 6 };
         jadwalToShow.sort((a, b) => {
           if (urutanHari[a.hari] !== urutanHari[b.hari]) return urutanHari[a.hari] - urutanHari[b.hari];
           return String(a.jamMulai).localeCompare(String(b.jamMulai));
         });
 
-        // Form HANYA muncul untuk Admin
         let formJadwal = '';
         if (isAdmin) {
           formJadwal = `
@@ -711,14 +716,14 @@ window.submitGuru = async (e) => {
                   </div>
                   <div class="field">
                     <label>Mata Pelajaran</label>
-                    <select name="mapelId" id="jadwalMapel" required>
+                    <select name="mapelId" id="jadwalMapel" required onchange="filterGuruJadwal()">
                       ${DB.mapel.map(m => `<option value="${m.id}">${m.nama}</option>`).join('')}
                     </select>
                   </div>
                   <div class="field">
                     <label>Guru Pengampu</label>
                     <select name="guruId" id="jadwalGuru" required>
-                      ${DB.guru.map(g => `<option value="${g.id}">${g.nama}</option>`).join('')}
+                      <option value="">-- Pilih Mapel Dulu --</option>
                     </select>
                   </div>
                 </div>
@@ -731,10 +736,15 @@ window.submitGuru = async (e) => {
           `;
         }
 
+        let tombolGenerate = isAdmin ? `<button class="btn btn-success" onclick="generateJadwalOtomatis()">✨ Generate Jadwal Otomatis</button>` : '';
+
         html = `
           ${formJadwal}
           <div class="card">
             <h3>Jadwal ${waliInfo ? 'Kelas ' + waliInfo.kelasNama : (isGuru ? 'Mengajar Anda' : 'Semua Kelas')}</h3>
+            
+            <div class="btn-row" style="margin-bottom: 15px;">${tombolGenerate}</div>
+
             <div class="table-wrap"><table><thead><tr><th>Hari</th><th>Jam</th><th>Kelas</th><th>Mapel</th><th>Guru</th>${isAdmin ? '<th>Aksi</th>' : ''}</tr></thead>
             <tbody>${jadwalToShow.map(j => `<tr>
               <td><b>${esc(j.hari)}</b></td>
@@ -749,7 +759,10 @@ window.submitGuru = async (e) => {
             </tr>`).join('') || `<tr><td colspan="${isAdmin ? 6 : 5}" class="empty">Belum ada jadwal</td></tr>`}</tbody></table></div>
           </div>`;
         
-        // Isi form jika sedang mode edit
+        // Panggil filter guru saat form dibuka
+        setTimeout(() => filterGuruJadwal(), 50);
+
+        // Jika sedang mode Edit, isi form dengan data yang ada
         if (editJadwalId) {
           setTimeout(() => {
             const j = DB.jadwal.find(x => x.id === editJadwalId);
@@ -759,11 +772,17 @@ window.submitGuru = async (e) => {
               document.getElementById('jadwalSelesai').value = j.jamSelesai;
               document.getElementById('jadwalKelas').value = j.kelasId;
               document.getElementById('jadwalMapel').value = j.mapelId;
-              document.getElementById('jadwalGuru').value = j.guruId;
+              filterGuruJadwal(); // Filter guru berdasarkan mapel
+              setTimeout(() => {
+                document.getElementById('jadwalGuru').value = j.guruId;
+              }, 50);
             }
           }, 100);
         }
       } 
+      // ==========================================
+      // 3. SUB-TAB NILAI
+      // ==========================================
       else if (t === 'nilai') {
         let filterMapel = DB.mapel, filterKelas = DB.kelas;
         if (isGuru || waliInfo) {
@@ -798,6 +817,9 @@ window.submitGuru = async (e) => {
           `;
         }
       }
+      // ==========================================
+      // 4. SUB-TAB ABSENSI
+      // ==========================================
       else if (t === 'absensi') {
         let filterMapel = DB.mapel, filterKelas = DB.kelas;
         if (isGuru || waliInfo) {
@@ -849,10 +871,10 @@ window.submitGuru = async (e) => {
           }
         }
       }
+      
       $('#content').innerHTML = renderAkademik() + `<div id="subContent">${html}</div>`;
       if (t === 'absensi' && subTabAbsensi === 'rekap') renderRekapAbsensi();
     }
-
     // ==========================================
     // LOGIKA KASUS & JURNAL
     // ==========================================
@@ -1262,7 +1284,92 @@ window.editJadwal = (id) => {
   editJadwalId = id;
   activateSubTab('jadwal');
 };
+window.generateJadwalOtomatis = async () => {
+  if (!confirm('⚠️ PERINGATAN!\n\nIni akan MENGHAPUS semua jadwal yang ada saat ini dan membuat jadwal baru secara otomatis.\n\nApakah Anda yakin?')) return;
+  
+  // Siapkan slot jam (8 jam pelajaran)
+  const timeSlots = [
+    { mulai: '07:00', selesai: '07:40' },
+    { mulai: '07:40', selesai: '08:20' },
+    { mulai: '08:20', selesai: '09:00' },
+    { mulai: '09:20', selesai: '10:00' },
+    { mulai: '10:00', selesai: '10:40' },
+    { mulai: '11:00', selesai: '11:40' },
+    { mulai: '11:40', selesai: '12:20' },
+    { mulai: '13:00', selesai: '13:40' }
+  ];
+  const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  
+  let teacherBusy = {}; // Mencegah guru mengajar 2 kelas di jam sama
+  let newJadwal = [];
+  
+  // Acak urutan kelas agar jadwal tidak monoton
+  const shuffledKelas = [...DB.kelas].sort(() => Math.random() - 0.5);
 
+  days.forEach(hari => {
+    timeSlots.forEach(slot => {
+      shuffledKelas.forEach(kelas => {
+        // Cari guru yang mengajar di kelas ini
+        let eligibleGurus = DB.guru.filter(g => {
+          const kelasIds = String(g.kelasIds || '').split(',');
+          return kelasIds.includes(kelas.id);
+        });
+        
+        // Acak guru agar mata pelajarannya bervariasi
+        eligibleGurus.sort(() => Math.random() - 0.5);
+        
+        let assigned = false;
+        for (let guru of eligibleGurus) {
+          const key = `${guru.id}_${hari}_${slot.mulai}`;
+          if (!teacherBusy[key]) {
+            teacherBusy[key] = true; // Kunci guru ini di jam tersebut
+            newJadwal.push({
+              hari: hari,
+              jamMulai: slot.mulai,
+              jamSelesai: slot.selesai,
+              kelasId: kelas.id,
+              mapelId: guru.mapelId,
+              guruId: guru.id
+            });
+            assigned = true;
+            break;
+          }
+        }
+        
+        // Jika tidak ada guru yang tersedia untuk kelas ini di jam tersebut, biarkan kosong
+        if (!assigned) {
+          newJadwal.push({
+            hari: hari,
+            jamMulai: slot.mulai,
+            jamSelesai: slot.selesai,
+            kelasId: kelas.id,
+            mapelId: '',
+            guruId: ''
+          });
+        }
+      });
+    });
+  });
+
+  showLoading('Menghapus jadwal lama & menyimpan jadwal baru...');
+  try {
+    // 1. Hapus semua jadwal lama di Spreadsheet
+    await apiCall('clearSheet', 'jadwal');
+    
+    // 2. Simpan semua jadwal baru sekaligus
+    await apiCall('bulkSave', 'jadwal', { data: newJadwal });
+    
+    toast('Jadwal otomatis berhasil dibuat!');
+    
+    // Refresh data aplikasi
+    const res = await apiCall('getAllData'); DB = { ...DB, ...res.data };
+    activateSubTab('jadwal');
+  } catch (e) {
+    toast(e.message, 'error');
+  } finally {
+    hideLoading();
+  }
+};
 window.submitJadwal = async (e) => {
   e.preventDefault();
   const data = Object.fromEntries(new FormData(e.target).entries());
